@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: "class",
+  darkMode: ["class", ".figma-dark"],
   content: ["./src/ui/index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {

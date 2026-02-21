@@ -19,6 +19,7 @@ export default function Home() {
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selection, setSelection] = useState<{ id: string; name: string; type: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -28,6 +29,41 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const { type, selection: newSelection } = event.data.pluginMessage || {};
+      if (type === 'selection-changed') {
+        setSelection(newSelection);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const getSelectionContext = (): Promise<{ context: { id: string } | null; designSystem: { paintStyles: unknown; textStyles: unknown; } | null }> => {
+    return new Promise((resolve) => {
+      const requestId = Date.now().toString();
+
+      const handler = (event: MessageEvent) => {
+        const { type, context, designSystem, requestId: responseId } = event.data.pluginMessage || {};
+        if (type === 'selection-context-response' && responseId === requestId) {
+          window.removeEventListener('message', handler);
+          resolve({ context, designSystem });
+        }
+      };
+
+      window.addEventListener('message', handler);
+      parent.postMessage({ pluginMessage: { type: 'get-selection-context', requestId } }, '*');
+
+      // Timeout fallback
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        resolve({ context: null, designSystem: null });
+      }, 1000);
+    });
+  };
 
   const handleSendMessage = async (content: string, model: ModelType) => {
     // Add user message
@@ -43,14 +79,18 @@ export default function Home() {
     try {
       console.log(`Sending request to ${model} with prompt: ${content}`);
 
+      const { context, designSystem } = await getSelectionContext();
+
       // Call Gemini API
-      const uiStructure = await generateUI(content, model);
+      const uiStructure = await generateUI(content, model, context, designSystem);
 
       // Add assistant message
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `I've generated a design for "${content}" using ${model}.`
+        content: context
+          ? `I've updated the design for "${content}" using ${model}.`
+          : `I've generated a design for "${content}" using ${model}.`
       };
       setMessages(prev => [...prev, assistantMessage]);
 
@@ -59,7 +99,8 @@ export default function Home() {
         pluginMessage: {
           type: 'generate-ui-from-json',
           structure: uiStructure,
-          prompt: content
+          prompt: content,
+          replaceNodeId: context ? context.id : undefined
         }
       }, '*');
 
@@ -109,7 +150,7 @@ export default function Home() {
       </div>
 
       {/* Input Area */}
-      <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
+      <ChatInput onSend={handleSendMessage} isLoading={isLoading} selection={selection} />
     </div>
   );
 }

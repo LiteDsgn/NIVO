@@ -1,14 +1,15 @@
 import React, { useState, KeyboardEvent } from 'react';
-import { Send, Loader2, ChevronDown } from 'lucide-react';
+import { Send, Loader2, ChevronDown, MousePointer2 } from 'lucide-react';
 
 export type ModelType = 'gemini-2.5-flash' | 'gemini-2.5-pro';
 
 interface ChatInputProps {
   onSend: (message: string, model: ModelType) => void;
   isLoading?: boolean;
+  selection?: { id: string; name: string; type: string }[];
 }
 
-export function ChatInput({ onSend, isLoading }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelType>('gemini-2.5-flash');
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -37,6 +38,21 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
 
   return (
     <div className="border-t border-figma-border bg-figma-bg p-2 flex flex-col gap-1">
+      {/* Selection Context */}
+      {selection.length > 0 && (
+        <div className="flex items-center gap-2 px-2 py-1.5 bg-figma-bg-secondary rounded-md border border-figma-border mb-1">
+          <MousePointer2 className="h-3.5 w-3.5 text-figma-text-brand shrink-0" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-[11px] font-medium text-figma-text truncate leading-tight">
+              {selection.length === 1 ? selection[0].name : `${selection.length} items selected`}
+            </span>
+            <span className="text-[10px] text-figma-text-tertiary leading-tight lowercase">
+              {selection.length === 1 ? selection[0].type : 'Multiple objects'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Model Selector */}
       <div className="relative">
         <button
