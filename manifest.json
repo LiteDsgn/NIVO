@@ -1,0 +1,14 @@
+{
+  "name": "Nivo",
+  "id": "nivo-plugin",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/index.html",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "This plugin connects to external AI services (like OpenAI/Anthropic) to generate designs and assets."
+  }
+}
