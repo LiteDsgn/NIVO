@@ -1,5 +1,6 @@
 import React, { useState, KeyboardEvent } from 'react';
 import { Send, Loader2, ChevronDown, MousePointer2 } from 'lucide-react';
+import { QuickActions } from './QuickActions';
 
 export type ModelType = 'gemini-2.5-flash' | 'gemini-2.5-pro';
 
@@ -14,16 +15,19 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
   const [selectedModel, setSelectedModel] = useState<ModelType>('gemini-2.5-flash');
   const [showModelMenu, setShowModelMenu] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim() || isLoading) return;
-    onSend(input, selectedModel);
+  const handleSend = (text: string | any) => {
+    // If text is an event (from onClick), use input state. Otherwise use the provided text.
+    const messageToSend = typeof text === 'string' ? text : input;
+    
+    if (!messageToSend.trim() || isLoading) return;
+    onSend(messageToSend, selectedModel);
     setInput('');
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleSend(input);
     }
   };
 
@@ -38,18 +42,22 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
 
   return (
     <div className="border-t border-figma-border bg-figma-bg p-2 flex flex-col gap-1">
-      {/* Selection Context */}
+      {/* Selection Context & Quick Actions */}
       {selection.length > 0 && (
-        <div className="flex items-center gap-2 px-2 py-1.5 bg-figma-bg-secondary rounded-md border border-figma-border mb-1">
-          <MousePointer2 className="h-3.5 w-3.5 text-figma-text-brand shrink-0" />
-          <div className="flex flex-col min-w-0">
-            <span className="text-[11px] font-medium text-figma-text truncate leading-tight">
-              {selection.length === 1 ? selection[0].name : `${selection.length} items selected`}
-            </span>
-            <span className="text-[10px] text-figma-text-tertiary leading-tight lowercase">
-              {selection.length === 1 ? selection[0].type : 'Multiple objects'}
-            </span>
+        <div className="flex flex-col gap-2 mb-1">
+          <div className="flex items-center gap-2 px-2 py-1.5 bg-figma-bg-secondary rounded-md border border-figma-border">
+            <MousePointer2 className="h-3.5 w-3.5 text-figma-text-brand shrink-0" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[11px] font-medium text-figma-text truncate leading-tight">
+                {selection.length === 1 ? selection[0].name : `${selection.length} items selected`}
+              </span>
+              <span className="text-[10px] text-figma-text-tertiary leading-tight lowercase">
+                {selection.length === 1 ? selection[0].type : 'Multiple objects'}
+              </span>
+            </div>
           </div>
+          
+          <QuickActions selection={selection} onAction={handleSend} />
         </div>
       )}
 
