@@ -14,11 +14,12 @@ function getGenAI(): GoogleGenerativeAI {
   return _genAI;
 }
 
-export async function generateUI(prompt: string, modelName: string = "gemini-2.5-flash", context: unknown = null, designSystem: { paintStyles: unknown, textStyles: unknown, components?: unknown[] } | null = null, settings: { brandContext?: string; enforceWCAG?: boolean } | null = null) {
+export async function generateUI(messages: { role: 'user' | 'assistant', content: string }[], modelName: string = "gemini-2.5-flash", context: unknown = null, designSystem: { paintStyles: unknown, textStyles: unknown, components?: unknown[] } | null = null, settings: { brandContext?: string; enforceWCAG?: boolean; platform?: 'mobile' | 'web'; reasoningMode?: boolean } | null = null) {
   try {
+    const isReasoning = settings?.reasoningMode === true;
     const model = getGenAI().getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: "application/json" }
+      ...(isReasoning ? {} : { generationConfig: { responseMimeType: "application/json" } })
     });
 
     let systemPrompt = `
@@ -121,8 +122,16 @@ export async function generateUI(prompt: string, modelName: string = "gemini-2.5
       ═══════════════════════════════════════════
       SECTION 3: OUTPUT FORMAT
       ═══════════════════════════════════════════
-
+      ${isReasoning ? `
+      You are in REASONING & PLANNING MODE. You can choose to either:
+      1. ASK CLARIFYING QUESTIONS / PRESENT A PLAN: If the user's request is vague or lacks necessary details (e.g., they ask for "a screen" without specifying the type or purpose, or you need to confirm layout choices), return PLAIN TEXT explaining your plan or asking concise questions. Do NOT return JSON in this case. Only ask questions if context is truly missing (do not ask annoying or easily-assumable questions).
+      2. GENERATE DESIGN: If you have enough context to generate the design, you MUST wrap your JSON output in <UI_JSON> tags like this:
+         <UI_JSON>
+         { ... json ... }
+         </UI_JSON>
+      ` : `
       Generate a JSON object (single root node) or array of nodes.
+      `}
 
       NODE SCHEMA:
       {
@@ -133,6 +142,8 @@ export async function generateUI(prompt: string, modelName: string = "gemini-2.5
         "fills": [{ "type": "SOLID", "color": { "r": 0-1, "g": 0-1, "b": 0-1 } }],
         "children": [... nested nodes],
         "layoutMode": "VERTICAL" | "HORIZONTAL" | "NONE",
+        "primaryAxisSizingMode": "FIXED" | "AUTO" (optional, default AUTO. Make FIXED for root frames!),
+        "counterAxisSizingMode": "FIXED" | "AUTO" (optional, default AUTO. Make FIXED for root frames!),
         "itemSpacing": number,
         "padding": { "top": n, "right": n, "bottom": n, "left": n },
         "characters": "string (TEXT nodes only)",
@@ -266,7 +277,7 @@ export async function generateUI(prompt: string, modelName: string = "gemini-2.5
         ]
       }
 
-      Return ONLY valid JSON. No markdown. No comments. No explanation.
+      ${isReasoning ? `If generating JSON, it MUST be valid JSON wrapped in <UI_JSON> tags.` : `Return ONLY valid JSON. No markdown. No comments. No explanation.`}
     `;
 
     if (designSystem) {
@@ -320,7 +331,33 @@ export async function generateUI(prompt: string, modelName: string = "gemini-2.5
       }
     }
 
-    let userPrompt = `User Prompt: ${prompt}`;
+    // Inject platform context
+    if (settings?.platform) {
+      const isMobile = settings.platform === 'mobile';
+      systemPrompt += `
+
+        PLATFORM CONTEXT:
+        The target platform is ${isMobile ? 'MOBILE (iOS / Android app)' : 'WEB / DESKTOP'}.
+        
+        Depending on what the user asks for (a full screen vs a single component), adapt your dimensions appropriately. Do NOT hardcode full-screen dimensions if they only ask for a smaller widget, badge, or pill.
+
+        ${isMobile ? `MOBILE GUIDELINES:
+        - Viewport: If designing a full screen, use standard mobile dimensions (e.g., iPhone 14/15/16 sizes). If designing a component, size it contextually.
+        - Layout: Root full-screen frames MUST have primaryAxisSizingMode: "FIXED" and counterAxisSizingMode: "FIXED" with standard padding to prevent collapsing. Component root frames can be "AUTO" (hug) if appropriate.
+        - Aesthetics: Follow standard iOS Human Interface Guidelines or Android Material Design principles for proportions and spacing (unless overriding brand styles are given).
+        - Usability: Ensure touch targets are minimum 44×44px. Use mobile-friendly patterns (bottom sheets, tab bars, standard padding conventions).`
+          : `WEB / DESKTOP GUIDELINES:
+        - Viewport: If designing a full page, use standard desktop widths (e.g., 1280px or 1440px). If designing a widget/component, size it contextually.
+        - Layout: Root full-page frames MUST have primaryAxisSizingMode: "FIXED" and counterAxisSizingMode: "FIXED" with generous padding. Component root frames can be "AUTO" (hug).
+        - Aesthetics: Follow conventions from popular modern web component libraries (like shadcn/ui, Radix, or standard Tailwind patterns) for proportions, spacing, and design logic.
+        - Usability: Use native web patterns (top navigation bars, sidebars, multi-column grid layouts, etc.).`}
+        `;
+    }
+
+    let userPromptContext = `CONVERSATION HISTORY:\n`;
+    for (const msg of messages) {
+      userPromptContext += `${msg.role === 'user' ? 'USER' : 'ASSISTANT'}: ${msg.content}\n\n`;
+    }
 
     if (context) {
       systemPrompt += `
@@ -338,12 +375,12 @@ export async function generateUI(prompt: string, modelName: string = "gemini-2.5
         4. Do NOT wrap the output in a list if the input was a single object, unless the user asks to duplicate it.
         `;
 
-      userPrompt = `User Prompt (Modify Existing Design): ${prompt}`;
+      userPromptContext += `(Modify Existing Design active)\n`;
     }
 
     const result = await model.generateContent([
       systemPrompt,
-      userPrompt
+      userPromptContext
     ]);
 
     const response = await result.response;
@@ -352,7 +389,15 @@ export async function generateUI(prompt: string, modelName: string = "gemini-2.5
     // Clean up potential markdown code blocks
     const jsonString = text.replace(/```json\n?|\n?```/g, "").trim();
 
-    return JSON.parse(jsonString);
+    if (isReasoning) {
+      const match = text.match(/<UI_JSON>([\s\S]*?)<\/UI_JSON>/);
+      if (match && match[1]) {
+        return { type: 'ui', structure: JSON.parse(match[1].trim()) };
+      }
+      return { type: 'text', text: text.trim() };
+    }
+
+    return { type: 'ui', structure: JSON.parse(jsonString) };
   } catch (error) {
     console.error("Error generating UI:", error);
     throw error;

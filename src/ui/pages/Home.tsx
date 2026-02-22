@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from '@/components/chat/MessageBubble';
-import { ChatInput, ModelType } from '@/components/chat/ChatInput';
+import { ChatInput, ModelType, PlatformType } from '@/components/chat/ChatInput';
 import { DraftControls } from '@/components/chat/DraftControls';
 import { QuickActions } from '@/components/chat/QuickActions';
 import { WelcomeState } from '@/components/chat/WelcomeState';
@@ -84,39 +84,77 @@ export default function Home() {
     });
   };
 
-  const handleSendMessage = async (content: string, model: ModelType) => {
+  const handleSendMessage = async (content: string, model: ModelType, platform: PlatformType = 'mobile', reasoningMode: boolean = false) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
       content,
       model
     };
-    setMessages(prev => [...prev, userMessage]);
+
+    // Capture the latest history immediately so we can pass it to the API
+    let conversationHistory: Message[] = [];
+    setMessages(prev => {
+      conversationHistory = [...prev, userMessage];
+      return conversationHistory;
+    });
+
     setIsLoading(true);
 
     try {
-      console.log(`Sending request to ${model} with prompt: ${content}`);
+      console.log(`Sending request to ${model} with prompt: ${content} (Reasoning: ${reasoningMode})`);
 
       const { context, designSystem } = await getSelectionContext();
 
-      const uiStructure = await generateUI(content, model, context, designSystem, {
+      const apiMessages = conversationHistory.map(m => ({ role: m.role, content: m.content }));
+
+      const result = await generateUI(apiMessages, model, context, designSystem, {
         brandContext,
         enforceWCAG,
+        platform,
+        reasoningMode
       });
+
+      if (result.type === 'text') {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: result.text
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
+        return; // Don't trigger the canvas update if it's just planning text
+      }
+
+      // If we got here, we have a UI structure
+      const naturalResponses = [
+        "Done! Check the canvas for your new design.",
+        "Here you go, I've laid it out on the canvas.",
+        "All set! Let me know if you want to tweak anything.",
+        "Design generated successfully."
+      ];
+
+      const naturalModResponses = [
+        "I've applied those changes to the design.",
+        "Updated successfully based on your request.",
+        "The design has been modified. How does it look?",
+        "Changes applied to the canvas!"
+      ];
+
+      const responsePool = context ? naturalModResponses : naturalResponses;
+      const randomContent = responsePool[Math.floor(Math.random() * responsePool.length)];
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: context
-          ? `I've updated the design for "${content}".`
-          : `I've generated a design for "${content}". Check your canvas!`
+        content: randomContent
       };
       setMessages(prev => [...prev, assistantMessage]);
 
       parent.postMessage({
         pluginMessage: {
           type: 'generate-ui-from-json',
-          structure: uiStructure,
+          structure: result.structure,
           prompt: content,
           replaceNodeId: context ? context.id : undefined
         }
@@ -167,7 +205,7 @@ export default function Home() {
             <div ref={messagesEndRef} />
           </div>
         ) : (
-          <WelcomeState onSuggestionClick={(prompt) => handleSendMessage(prompt, 'gemini-3-flash-preview')} />
+          <WelcomeState onSuggestionClick={(prompt) => handleSendMessage(prompt, 'gemini-3-flash-preview', 'mobile')} />
         )}
       </div>
 

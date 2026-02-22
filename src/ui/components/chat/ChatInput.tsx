@@ -1,10 +1,11 @@
 import React, { useState, KeyboardEvent } from 'react';
-import { Send, Loader2, ChevronDown, MousePointer2 } from 'lucide-react';
+import { Send, Loader2, ChevronDown, MousePointer2, Smartphone, Monitor, Brain } from 'lucide-react';
 
 export type ModelType = 'gemini-2.5-flash' | 'gemini-3-flash-preview';
+export type PlatformType = 'mobile' | 'web';
 
 interface ChatInputProps {
-  onSend: (message: string, model: ModelType) => void;
+  onSend: (message: string, model: ModelType, platform: PlatformType, reasoningMode: boolean) => void;
   isLoading?: boolean;
   selection?: { id: string; name: string; type: string }[];
 }
@@ -12,14 +13,14 @@ interface ChatInputProps {
 export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelType>('gemini-3-flash-preview');
+  const [platform, setPlatform] = useState<PlatformType>('mobile');
   const [showModelMenu, setShowModelMenu] = useState(false);
+  const [reasoningMode, setReasoningMode] = useState(false);
 
   const handleSend = (text: string | any) => {
-    // If text is an event (from onClick), use input state. Otherwise use the provided text.
     const messageToSend = typeof text === 'string' ? text : input;
-
     if (!messageToSend.trim() || isLoading) return;
-    onSend(messageToSend, selectedModel);
+    onSend(messageToSend, selectedModel, platform, reasoningMode);
     setInput('');
   };
 
@@ -30,9 +31,7 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
     }
   };
 
-  const toggleModelMenu = () => {
-    setShowModelMenu(!showModelMenu);
-  };
+  const toggleModelMenu = () => setShowModelMenu(!showModelMenu);
 
   const selectModel = (model: ModelType) => {
     setSelectedModel(model);
@@ -66,34 +65,74 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
       />
 
       <div className="flex items-center justify-between px-1 pb-1">
-        {/* Model Selector */}
-        <div className="relative">
+        {/* Left: Platform Toggle + Model Selector */}
+        <div className="flex items-center gap-1.5">
+          {/* Reasoning Mode Toggle */}
           <button
-            onClick={toggleModelMenu}
-            className="flex items-center gap-1 text-figma-11 font-medium text-figma-text-secondary hover:text-figma-text px-1 py-1 rounded-sm transition-colors"
+            onClick={() => setReasoningMode(!reasoningMode)}
+            title="Reasoning Mode (Plan before designing)"
+            className={`flex items-center justify-center w-[26px] h-[26px] rounded-md transition-all duration-150 border ${reasoningMode
+                ? 'bg-figma-bg-brand/10 border-figma-border-brand text-figma-text-brand shadow-sm'
+                : 'bg-transparent border-transparent text-figma-text-tertiary hover:bg-figma-bg-secondary hover:text-figma-text-secondary'
+              }`}
           >
-            {selectedModel === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : 'Gemini 3.0 Flash Preview'}
-            <ChevronDown className="h-3 w-3" />
+            <Brain className="h-[14px] w-[14px]" />
           </button>
 
-          {showModelMenu && (
-            <div className="absolute bottom-full left-0 mb-1 w-40 rounded-figma-2 border border-figma-border bg-figma-bg shadow-figma-menu py-1 z-20">
-              <button
-                onClick={() => selectModel('gemini-2.5-flash')}
-                className={`w-full text-left px-3 py-1.5 text-figma-11 hover:bg-figma-bg-hover ${selectedModel === 'gemini-2.5-flash' ? 'text-figma-text-brand font-medium' : 'text-figma-text'}`}
-              >
-                Gemini 2.5 Flash
-              </button>
-              <button
-                onClick={() => selectModel('gemini-3-flash-preview')}
-                className={`w-full text-left px-3 py-1.5 text-figma-11 hover:bg-figma-bg-hover ${selectedModel === 'gemini-3-flash-preview' ? 'text-figma-text-brand font-medium' : 'text-figma-text'}`}
-              >
-                Gemini 3.0 Flash Preview
-              </button>
-            </div>
-          )}
+          {/* Platform Toggle */}
+          <div className="flex items-center bg-figma-bg-secondary rounded-md p-0.5 border border-figma-border">
+            <button
+              onClick={() => setPlatform('mobile')}
+              title="Mobile"
+              className={`flex items-center justify-center w-[22px] h-[18px] rounded transition-all duration-150 ${platform === 'mobile'
+                ? 'bg-figma-bg shadow-sm text-figma-text'
+                : 'text-figma-text-tertiary hover:text-figma-text-secondary'
+                }`}
+            >
+              <Smartphone className="h-[10px] w-[10px]" />
+            </button>
+            <button
+              onClick={() => setPlatform('web')}
+              title="Web / Desktop"
+              className={`flex items-center justify-center w-[22px] h-[18px] rounded transition-all duration-150 ${platform === 'web'
+                ? 'bg-figma-bg shadow-sm text-figma-text'
+                : 'text-figma-text-tertiary hover:text-figma-text-secondary'
+                }`}
+            >
+              <Monitor className="h-[10px] w-[10px]" />
+            </button>
+          </div>
+
+          {/* Model Selector */}
+          <div className="relative">
+            <button
+              onClick={toggleModelMenu}
+              className="flex items-center gap-1 text-figma-11 font-medium text-figma-text-secondary hover:text-figma-text px-1 py-1 rounded-sm transition-colors"
+            >
+              {selectedModel === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : 'Gemini 3.0 Flash Preview'}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+
+            {showModelMenu && (
+              <div className="absolute bottom-full left-0 mb-1 w-40 rounded-figma-2 border border-figma-border bg-figma-bg shadow-figma-menu py-1 z-20">
+                <button
+                  onClick={() => selectModel('gemini-2.5-flash')}
+                  className={`w-full text-left px-3 py-1.5 text-figma-11 hover:bg-figma-bg-hover ${selectedModel === 'gemini-2.5-flash' ? 'text-figma-text-brand font-medium' : 'text-figma-text'}`}
+                >
+                  Gemini 2.5 Flash
+                </button>
+                <button
+                  onClick={() => selectModel('gemini-3-flash-preview')}
+                  className={`w-full text-left px-3 py-1.5 text-figma-11 hover:bg-figma-bg-hover ${selectedModel === 'gemini-3-flash-preview' ? 'text-figma-text-brand font-medium' : 'text-figma-text'}`}
+                >
+                  Gemini 3.0 Flash Preview
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Right: Send Button */}
         <button
           onClick={handleSend}
           disabled={!input.trim() || isLoading}

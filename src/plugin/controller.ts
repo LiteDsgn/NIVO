@@ -28,10 +28,14 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
     if (nodeData.cornerRadius) frame.cornerRadius = nodeData.cornerRadius;
 
-    // Default primary axis sizing to hug if it has children and layout mode
+    // Handle Sizing Modes (Hug vs Fixed)
     if (nodeData.layoutMode && nodeData.layoutMode !== "NONE") {
-      frame.primaryAxisSizingMode = "AUTO";
-      frame.counterAxisSizingMode = "AUTO";
+      // Allow JSON to specify sizing modes, default to AUTO (Hug) for children,
+      // but if it's the root node (parent is Page), default lateral to FIXED to keep device width.
+      const isRoot = parent.type === 'PAGE' || parent.type === 'DOCUMENT';
+
+      frame.primaryAxisSizingMode = nodeData.primaryAxisSizingMode || (isRoot ? (nodeData.layoutMode === 'VERTICAL' ? 'AUTO' : 'FIXED') : 'AUTO');
+      frame.counterAxisSizingMode = nodeData.counterAxisSizingMode || (isRoot ? (nodeData.layoutMode === 'VERTICAL' ? 'FIXED' : 'AUTO') : 'AUTO');
     }
 
     if (nodeData.children) {
