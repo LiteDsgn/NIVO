@@ -1,7 +1,8 @@
 import { MemoryRouter as Router, Routes, Route, NavLink } from "react-router-dom";
 import Home from "@/pages/Home";
+import DesignSystem from "@/pages/DesignSystem";
 import Settings from "@/pages/Settings";
-import { MessageSquare, Settings as SettingsIcon } from "lucide-react";
+import { MessageSquare, Settings as SettingsIcon, Palette } from "lucide-react";
 
 export default function App() {
   return (
@@ -22,6 +23,18 @@ export default function App() {
             <span>Copilot</span>
           </NavLink>
           <NavLink
+            to="/design-system"
+            className={({ isActive }) =>
+              `flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-figma-11 font-medium transition-all duration-150 ${isActive
+                ? "bg-figma-bg-hover text-figma-text shadow-sm border border-figma-border"
+                : "text-figma-text-secondary hover:text-figma-text hover:bg-figma-bg-hover/50 border border-transparent"
+              }`
+            }
+          >
+            <Palette className="h-3.5 w-3.5" />
+            <span>Design System</span>
+          </NavLink>
+          <NavLink
             to="/settings"
             className={({ isActive }) =>
               `flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-figma-11 font-medium transition-all duration-150 ${isActive
@@ -39,6 +52,7 @@ export default function App() {
         <div className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>

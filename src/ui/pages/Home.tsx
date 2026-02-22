@@ -178,11 +178,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* Input Tray */}
-      <div className={`border-t border-figma-border bg-figma-bg transition-all duration-200 ${draftMode ? 'pointer-events-none opacity-40' : ''}`}>
+      {/* Floating Input Area */}
+      <div className={`px-3 pb-3 transition-all duration-200 bg-transparent ${draftMode ? 'pointer-events-none opacity-40' : ''}`}>
         <ChatInput onSend={handleSendMessage} isLoading={isLoading} selection={selection} />
       </div>
-
       {/* Draft Controls */}
       {draftMode && (
         <DraftControls onAccept={handleDraftAccept} onDiscard={handleDraftDiscard} />
