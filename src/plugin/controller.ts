@@ -76,7 +76,22 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
 
   } else if (nodeData.type === 'TEXT') {
-    const fontStyle = nodeData.fontWeight || "Regular";
+    // Map AI font weight names to valid Inter font styles
+    const weightMap: Record<string, string> = {
+      'Thin': 'Thin',
+      'ExtraLight': 'ExtraLight',
+      'Light': 'Light',
+      'Regular': 'Regular',
+      'Medium': 'Medium',
+      'SemiBold': 'Semi Bold',
+      'Semi Bold': 'Semi Bold',
+      'Bold': 'Bold',
+      'ExtraBold': 'Extra Bold',
+      'Extra Bold': 'Extra Bold',
+      'Black': 'Black',
+    };
+    const rawWeight = nodeData.fontWeight || "Regular";
+    const fontStyle = weightMap[rawWeight] || "Regular";
     let loadedStyle = fontStyle;
     try {
       await figma.loadFontAsync({ family: "Inter", style: fontStyle });
