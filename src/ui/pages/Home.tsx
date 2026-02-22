@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ChatInput, ModelType } from '@/components/chat/ChatInput';
 import { DraftControls } from '@/components/chat/DraftControls';
+import { QuickActions } from '@/components/chat/QuickActions';
 import { WelcomeState } from '@/components/chat/WelcomeState';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { generateUI } from '@/lib/services/gemini';
@@ -167,8 +168,18 @@ export default function Home() {
         )}
       </div>
 
-      {/* Input Area */}
-      <div className={`transition-all duration-200 ${draftMode ? 'pointer-events-none opacity-40' : ''}`}>
+      {/* Quick Actions (Floating above input tray) */}
+      {!draftMode && selection.length > 0 && (
+        <div className="px-3 pb-2 pt-1">
+          <QuickActions
+            selection={selection}
+            onAction={(prompt) => handleSendMessage(prompt, 'gemini-3-flash-preview')}
+          />
+        </div>
+      )}
+
+      {/* Input Tray */}
+      <div className={`border-t border-figma-border bg-figma-bg transition-all duration-200 ${draftMode ? 'pointer-events-none opacity-40' : ''}`}>
         <ChatInput onSend={handleSendMessage} isLoading={isLoading} selection={selection} />
       </div>
 
