@@ -1,68 +1,106 @@
 import React from 'react';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { Palette, Puzzle, ShieldCheck, Sparkles } from 'lucide-react';
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={onChange}
+      className={`w-[28px] h-[14px] flex items-center rounded-full transition-all duration-200 focus:outline-none border shrink-0 ${checked
+          ? 'bg-figma-bg-brand border-figma-border-brand'
+          : 'bg-transparent border-figma-border-strong'
+        }`}
+    >
+      <div
+        className={`w-[10px] h-[10px] rounded-full transform transition-transform duration-200 ${checked
+            ? 'translate-x-[16px] bg-figma-icon-onbrand'
+            : 'translate-x-[1px] bg-figma-icon'
+          }`}
+      />
+    </button>
+  );
+}
+
+function SettingRow({ icon, label, description, children }: {
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 gap-3">
+      <div className="flex items-start gap-2.5 min-w-0">
+        <div className="mt-0.5 text-figma-icon-secondary shrink-0">{icon}</div>
+        <div className="flex flex-col min-w-0">
+          <span className="text-figma-11 font-medium text-figma-text">{label}</span>
+          <span className="text-[10px] text-figma-text-secondary leading-snug">{description}</span>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function Settings() {
   const { scanLocalVariables, swapComponents, enforceWCAG, brandContext, toggleSetting, setSetting } = useSettingsStore();
 
   return (
-    <div className="flex flex-col h-full bg-figma-bg p-4 space-y-6 overflow-y-auto pb-8">
+    <div className="flex flex-col h-full bg-figma-bg overflow-y-auto">
+      <div className="p-4 space-y-5">
+        {/* Design System */}
+        <section className="space-y-1">
+          <h2 className="text-[10px] font-semibold text-figma-text-secondary uppercase tracking-wider px-0.5 mb-2">Design System</h2>
+          <div className="space-y-0.5">
+            <SettingRow
+              icon={<Palette size={13} />}
+              label="Scan Local Variables"
+              description="Use colors & fonts from this file"
+            >
+              <ToggleSwitch checked={scanLocalVariables} onChange={() => toggleSetting('scanLocalVariables')} />
+            </SettingRow>
 
-      <div className="space-y-2">
-        <h2 className="text-figma-11 font-bold text-figma-text">Design System</h2>
-
-        <div className="flex items-center justify-between py-2">
-          <div className="flex flex-col">
-            <span className="text-figma-11 font-medium text-figma-text">Scan Local Variables</span>
-            <span className="text-figma-11 text-figma-text-secondary">Use colors &amp; fonts from this file</span>
+            <SettingRow
+              icon={<Puzzle size={13} />}
+              label="Swap Components"
+              description="Use local components when matching"
+            >
+              <ToggleSwitch checked={swapComponents} onChange={() => toggleSetting('swapComponents')} />
+            </SettingRow>
           </div>
-          <button
-            onClick={() => toggleSetting('scanLocalVariables')}
-            className={`w-[28px] h-[14px] flex items-center rounded-full transition-colors duration-200 focus:outline-none border ${scanLocalVariables ? 'bg-figma-bg-brand border-figma-border-brand' : 'bg-transparent border-figma-border-strong'}`}
-          >
-            <div className={`w-[10px] h-[10px] rounded-full transform transition-transform duration-200 ${scanLocalVariables ? 'translate-x-[16px] bg-figma-icon-onbrand' : 'translate-x-[1px] bg-figma-icon'}`} />
-          </button>
-        </div>
+        </section>
 
-        <div className="flex items-center justify-between py-2">
-          <div className="flex flex-col">
-            <span className="text-figma-11 font-medium text-figma-text">Swap Components</span>
-            <span className="text-figma-11 text-figma-text-secondary">Use local components when matching</span>
+        <div className="border-t border-figma-border" />
+
+        {/* Brand Context */}
+        <section className="space-y-2">
+          <div className="flex items-center gap-1.5 px-0.5">
+            <Sparkles size={12} className="text-figma-icon-secondary" />
+            <h2 className="text-[10px] font-semibold text-figma-text-secondary uppercase tracking-wider">Brand Context</h2>
           </div>
-          <button
-            onClick={() => toggleSetting('swapComponents')}
-            className={`w-[28px] h-[14px] flex items-center rounded-full transition-colors duration-200 focus:outline-none border ${swapComponents ? 'bg-figma-bg-brand border-figma-border-brand' : 'bg-transparent border-figma-border-strong'}`}
-          >
-            <div className={`w-[10px] h-[10px] rounded-full transform transition-transform duration-200 ${swapComponents ? 'translate-x-[16px] bg-figma-icon-onbrand' : 'translate-x-[1px] bg-figma-icon'}`} />
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <h2 className="text-figma-11 font-bold text-figma-text">Brand Context</h2>
-        <div className="relative">
+          <p className="text-[10px] text-figma-text-tertiary px-0.5">
+            Persistent context applied to all generations.
+          </p>
           <textarea
             value={brandContext}
             onChange={(e) => setSetting('brandContext', e.target.value)}
-            placeholder="e.g. Use rounded corners (8px), serif headings, and a playful vibe."
-            className="w-full h-32 text-figma-11 resize-none bg-figma-bg text-figma-text p-2 rounded-figma-2 border border-transparent hover:border-figma-border outline-none focus:border-figma-border-brand focus:ring-1 focus:ring-figma-border-brand transition-all"
+            placeholder="e.g. Use rounded corners (8px), serif headings, vibrant gradients, and a playful vibe."
+            className="w-full h-24 text-figma-11 resize-none bg-figma-bg-secondary text-figma-text p-2.5 rounded-lg border border-transparent hover:border-figma-border outline-none focus:border-figma-border-brand focus:ring-1 focus:ring-figma-border-brand/30 transition-all placeholder:text-figma-text-tertiary"
           />
-        </div>
-      </div>
+        </section>
 
-      <div className="space-y-2">
-        <h2 className="text-figma-11 font-bold text-figma-text">Accessibility</h2>
-        <div className="flex items-center justify-between py-2">
-          <div className="flex flex-col">
-            <span className="text-figma-11 font-medium text-figma-text">Enforce WCAG AAA</span>
-            <span className="text-figma-11 text-figma-text-secondary">Ensure high contrast ratios</span>
-          </div>
-          <button
-            onClick={() => toggleSetting('enforceWCAG')}
-            className={`w-[28px] h-[14px] flex items-center rounded-full transition-colors duration-200 focus:outline-none border ${enforceWCAG ? 'bg-figma-bg-brand border-figma-border-brand' : 'bg-transparent border-figma-border-strong'}`}
+        <div className="border-t border-figma-border" />
+
+        {/* Accessibility */}
+        <section className="space-y-1">
+          <h2 className="text-[10px] font-semibold text-figma-text-secondary uppercase tracking-wider px-0.5 mb-2">Accessibility</h2>
+          <SettingRow
+            icon={<ShieldCheck size={13} />}
+            label="Enforce WCAG AAA"
+            description="Ensure high contrast ratios in generated designs"
           >
-            <div className={`w-[10px] h-[10px] rounded-full transform transition-transform duration-200 ${enforceWCAG ? 'translate-x-[16px] bg-figma-icon-onbrand' : 'translate-x-[1px] bg-figma-icon'}`} />
-          </button>
-        </div>
+            <ToggleSwitch checked={enforceWCAG} onChange={() => toggleSetting('enforceWCAG')} />
+          </SettingRow>
+        </section>
       </div>
     </div>
   );

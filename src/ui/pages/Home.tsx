@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ChatInput, ModelType } from '@/components/chat/ChatInput';
 import { DraftControls } from '@/components/chat/DraftControls';
+import { WelcomeState } from '@/components/chat/WelcomeState';
+import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { generateUI } from '@/lib/services/gemini';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 
@@ -13,13 +15,7 @@ interface Message {
 }
 
 export default function Home() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: 'Hello! I\'m Nivo. Describe the UI you want to build, and I\'ll create it for you.'
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [draftMode, setDraftMode] = useState(false);
   const [selection, setSelection] = useState<{ id: string; name: string; type: string }[]>([]);
@@ -85,7 +81,6 @@ export default function Home() {
   };
 
   const handleSendMessage = async (content: string, model: ModelType) => {
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -100,23 +95,20 @@ export default function Home() {
 
       const { context, designSystem } = await getSelectionContext();
 
-      // Call Gemini API
       const uiStructure = await generateUI(content, model, context, designSystem, {
         brandContext,
         enforceWCAG,
       });
 
-      // Add assistant message
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: context
-          ? `I've updated the design for "${content}" using ${model}.`
-          : `I've generated a design for "${content}" using ${model}.`
+          ? `I've updated the design for "${content}".`
+          : `I've generated a design for "${content}". Check your canvas!`
       };
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Send generated structure to Figma
       parent.postMessage({
         pluginMessage: {
           type: 'generate-ui-from-json',
@@ -131,12 +123,12 @@ export default function Home() {
       let errorDetail = "An unknown error occurred.";
       if (error instanceof Error) {
         const msg = error.message;
-        if (msg.includes("API_KEY_INVALID") || msg.includes("API key not valid")) {
-          errorDetail = "Your Gemini API key is invalid. Please update it in Settings or in your .env file.";
+        if (msg.includes("API_KEY_INVALID") || msg.includes("API key not valid") || msg.includes("Missing Gemini API Key")) {
+          errorDetail = "Your API key is invalid or missing. Go to Settings to update it.";
         } else if (msg.includes("429") || msg.includes("quota")) {
-          errorDetail = "You've exceeded your Gemini API quota. Please wait a minute or upgrade your plan.";
+          errorDetail = "API quota exceeded. Please wait a moment and try again.";
         } else if (msg.includes("404") || msg.includes("not found")) {
-          errorDetail = "The selected model is not available. Please try a different model.";
+          errorDetail = "The selected model is unavailable. Try switching models.";
         } else {
           errorDetail = msg;
         }
@@ -144,7 +136,7 @@ export default function Home() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${errorDetail}`
+        content: `⚠️ ${errorDetail}`
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -152,23 +144,27 @@ export default function Home() {
     }
   };
 
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="flex flex-col h-full bg-figma-bg">
+    <div className="flex flex-col h-full bg-figma-bg relative">
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto scroll-smooth p-2 flex flex-col gap-2">
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-          />
-        ))}
-        {isLoading && (
-          <div className="px-3 py-2 text-figma-11 text-figma-text-secondary italic">
-            Generating...
+      <div className="flex-1 overflow-y-auto scroll-smooth">
+        {hasMessages ? (
+          <div className="flex flex-col gap-0.5 p-2">
+            {messages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                role={msg.role}
+                content={msg.content}
+              />
+            ))}
+            {isLoading && <TypingIndicator />}
+            <div ref={messagesEndRef} />
           </div>
+        ) : (
+          <WelcomeState onSuggestionClick={(prompt) => handleSendMessage(prompt, 'gemini-2.5-flash')} />
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
@@ -176,6 +172,7 @@ export default function Home() {
         <ChatInput onSend={handleSendMessage} isLoading={isLoading} selection={selection} />
       </div>
 
+      {/* Draft Controls */}
       {draftMode && (
         <DraftControls onAccept={handleDraftAccept} onDiscard={handleDraftDiscard} />
       )}
