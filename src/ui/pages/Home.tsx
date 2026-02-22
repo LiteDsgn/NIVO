@@ -163,7 +163,7 @@ export default function Home() {
             <div ref={messagesEndRef} />
           </div>
         ) : (
-          <WelcomeState onSuggestionClick={(prompt) => handleSendMessage(prompt, 'gemini-2.5-flash')} />
+          <WelcomeState onSuggestionClick={(prompt) => handleSendMessage(prompt, 'gemini-3-flash-preview')} />
         )}
       </div>
 

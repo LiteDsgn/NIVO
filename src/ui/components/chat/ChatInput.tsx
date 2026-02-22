@@ -2,7 +2,7 @@ import React, { useState, KeyboardEvent } from 'react';
 import { Send, Loader2, ChevronDown, MousePointer2 } from 'lucide-react';
 import { QuickActions } from './QuickActions';
 
-export type ModelType = 'gemini-2.5-flash' | 'gemini-2.5-pro';
+export type ModelType = 'gemini-2.5-flash' | 'gemini-3-flash-preview';
 
 interface ChatInputProps {
   onSend: (message: string, model: ModelType) => void;
@@ -12,13 +12,13 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps) {
   const [input, setInput] = useState('');
-  const [selectedModel, setSelectedModel] = useState<ModelType>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('gemini-3-flash-preview');
   const [showModelMenu, setShowModelMenu] = useState(false);
 
   const handleSend = (text: string | any) => {
     // If text is an event (from onClick), use input state. Otherwise use the provided text.
     const messageToSend = typeof text === 'string' ? text : input;
-    
+
     if (!messageToSend.trim() || isLoading) return;
     onSend(messageToSend, selectedModel);
     setInput('');
@@ -56,7 +56,7 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
               </span>
             </div>
           </div>
-          
+
           <QuickActions selection={selection} onAction={handleSend} />
         </div>
       )}
@@ -67,7 +67,7 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
           onClick={toggleModelMenu}
           className="flex items-center gap-1 text-figma-11 font-medium text-figma-text-secondary hover:text-figma-text px-1 py-1 rounded-sm transition-colors"
         >
-          {selectedModel === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : 'Gemini 2.5 Pro'}
+          {selectedModel === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : 'Gemini 3.0 Flash Preview'}
           <ChevronDown className="h-3 w-3" />
         </button>
 
@@ -80,10 +80,10 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
               Gemini 2.5 Flash
             </button>
             <button
-              onClick={() => selectModel('gemini-2.5-pro')}
-              className={`w-full text-left px-3 py-1.5 text-figma-11 hover:bg-figma-bg-hover ${selectedModel === 'gemini-2.5-pro' ? 'text-figma-text-brand font-medium' : 'text-figma-text'}`}
+              onClick={() => selectModel('gemini-3-flash-preview')}
+              className={`w-full text-left px-3 py-1.5 text-figma-11 hover:bg-figma-bg-hover ${selectedModel === 'gemini-3-flash-preview' ? 'text-figma-text-brand font-medium' : 'text-figma-text'}`}
             >
-              Gemini 2.5 Pro
+              Gemini 3.0 Flash Preview
             </button>
           </div>
         )}
