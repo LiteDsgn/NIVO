@@ -40,7 +40,7 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
   };
 
   return (
-    <div className="bg-figma-bg px-3 pb-3 flex flex-col gap-2">
+    <div className="bg-figma-bg p-3 flex flex-col gap-2">
       {/* Selection Context */}
       {selection.length > 0 && (
         <div className="flex items-center gap-2 px-2.5 py-1.5 bg-figma-bg-secondary rounded-md">
