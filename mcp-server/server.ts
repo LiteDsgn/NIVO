@@ -10,6 +10,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { WebSocketServer, WebSocket } from "ws";
+import http from "http";
 import { z } from "zod";
 
 const WS_PORT = 9600;
@@ -97,7 +98,7 @@ server.registerTool(
     {
         title: "Create Figma Design",
         description:
-            "Push a Figma node JSON tree onto the canvas. The structure must follow the Nivo JSON schema (FRAME/TEXT/RECTANGLE/ELLIPSE nodes with fills, layoutMode, padding, etc.). The design will appear as a draft on the canvas.",
+            "Push a Figma node JSON tree onto the canvas. The design is automatically placed to the right of existing content (canvas-aware positioning). The structure must follow the Nivo JSON schema (FRAME/TEXT/RECTANGLE/ELLIPSE nodes with fills, layoutMode, padding, etc.). Supports layoutSizingHorizontal/layoutSizingVertical ('FIXED'|'HUG'|'FILL') for controlling how children size within Auto Layout parents. The design will appear as a draft on the canvas.",
         inputSchema: {
             structure: z
                 .any()
@@ -244,6 +245,48 @@ server.registerTool(
         }
     }
 );
+
+// ─── HTTP Command Server (for dev/testing) ────────────────────────────────────
+
+const HTTP_PORT = 9601;
+const httpServer = http.createServer((req, res) => {
+    // Enable CORS
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    if (req.method === "POST" && req.url === "/generate") {
+        let body = "";
+        req.on("data", chunk => body += chunk);
+        req.on("end", async () => {
+            try {
+                const structure = JSON.parse(body);
+                console.error("[nivo-mcp] Received HTTP design request");
+                // Call sendToPlugin
+                await sendToPlugin({ type: "create", structure });
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ status: "success" }));
+            } catch (err: any) {
+                console.error("[nivo-mcp] HTTP request failed:", err);
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+    } else {
+        res.writeHead(404);
+        res.end();
+    }
+});
+
+httpServer.listen(HTTP_PORT, () => {
+    console.error(`[nivo-mcp] HTTP command server listening on http://localhost:${HTTP_PORT}`);
+});
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 

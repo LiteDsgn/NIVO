@@ -1,0 +1,145 @@
+
+{
+  "type": "FRAME",
+  "name": "Agrotech Hero Page",
+  "layoutMode": "VERTICAL",
+  "itemSpacing": 0,
+  "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+  "fills": [{ "type": "SOLID", "color": { "r": 0.98, "g": 0.98, "b": 0.96 } }],
+  "children": [
+    {
+      "type": "FRAME",
+      "name": "Navbar",
+      "layoutMode": "HORIZONTAL",
+      "layoutAlign": "STRETCH",
+      "padding": { "top": 20, "right": 40, "bottom": 20, "left": 40 },
+      "itemSpacing": 0,
+      "primaryAxisAlignItems": "SPACE_BETWEEN",
+      "counterAxisAlignItems": "CENTER",
+      "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }],
+      "children": [
+        {
+          "type": "TEXT",
+          "name": "Logo",
+          "characters": "AGROTECH",
+          "fontSize": 24,
+          "fontName": { "family": "Inter", "style": "Bold" },
+          "fills": [{ "type": "SOLID", "color": { "r": 0.1, "g": 0.3, "b": 0.1 } }]
+        },
+        {
+          "type": "FRAME",
+          "name": "Links",
+          "layoutMode": "HORIZONTAL",
+          "itemSpacing": 32,
+          "children": [
+            { "type": "TEXT", "characters": "Solutions", "fontSize": 16, "fontName": { "family": "Inter", "style": "Medium" }, "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }] },
+            { "type": "TEXT", "characters": "Technology", "fontSize": 16, "fontName": { "family": "Inter", "style": "Medium" }, "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }] },
+            { "type": "TEXT", "characters": "About", "fontSize": 16, "fontName": { "family": "Inter", "style": "Medium" }, "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.2, "b": 0.2 } }] }
+          ]
+        },
+        {
+          "type": "FRAME",
+          "name": "Button",
+          "layoutMode": "HORIZONTAL",
+          "padding": { "top": 12, "right": 24, "bottom": 12, "left": 24 },
+          "cornerRadius": 8,
+          "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.6, "b": 0.2 } }],
+          "children": [
+            {
+              "type": "TEXT",
+              "characters": "Get Started",
+              "fontSize": 14,
+              "fontName": { "family": "Inter", "style": "Bold" },
+              "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "FRAME",
+      "name": "Hero Section",
+      "layoutMode": "HORIZONTAL",
+      "layoutAlign": "STRETCH",
+      "padding": { "top": 80, "right": 80, "bottom": 80, "left": 80 },
+      "itemSpacing": 60,
+      "counterAxisAlignItems": "CENTER",
+      "children": [
+        {
+          "type": "FRAME",
+          "name": "Content",
+          "layoutMode": "VERTICAL",
+          "layoutGrow": 1,
+          "itemSpacing": 24,
+          "children": [
+             {
+              "type": "TEXT",
+              "name": "Tagline",
+              "characters": "SMART FARMING",
+              "fontSize": 14,
+              "letterSpacing": 2,
+              "fontName": { "family": "Inter", "style": "Bold" },
+              "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.6, "b": 0.2 } }]
+            },
+            {
+              "type": "TEXT",
+              "name": "Headline",
+              "characters": "Cultivating the Future with Intelligence",
+              "fontSize": 56,
+              "fontName": { "family": "Inter", "style": "Bold" },
+              "fills": [{ "type": "SOLID", "color": { "r": 0.1, "g": 0.2, "b": 0.1 } }]
+            },
+            {
+              "type": "TEXT",
+              "name": "Subhead",
+              "characters": "Maximize crop yields and minimize resource waste with our precision agriculture platform driven by satellite imagery and AI.",
+              "fontSize": 18,
+              "fontName": { "family": "Inter", "style": "Regular" },
+              "fills": [{ "type": "SOLID", "color": { "r": 0.4, "g": 0.4, "b": 0.4 } }]
+            },
+            {
+              "type": "FRAME",
+              "name": "Actions",
+              "layoutMode": "HORIZONTAL",
+              "itemSpacing": 16,
+              "padding": { "top": 24, "right": 0, "bottom": 0, "left": 0 },
+              "children": [
+                {
+                  "type": "FRAME",
+                  "name": "Primary Button",
+                  "layoutMode": "HORIZONTAL",
+                  "padding": { "top": 16, "right": 32, "bottom": 16, "left": 32 },
+                  "cornerRadius": 8,
+                  "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.6, "b": 0.2 } }],
+                  "children": [
+                    { "type": "TEXT", "characters": "Request Demo", "fontSize": 16, "fontName": { "family": "Inter", "style": "Bold" }, "fills": [{ "type": "SOLID", "color": { "r": 1, "g": 1, "b": 1 } }] }
+                  ]
+                },
+                {
+                  "type": "FRAME",
+                  "name": "Secondary Button",
+                  "layoutMode": "HORIZONTAL",
+                  "padding": { "top": 16, "right": 32, "bottom": 16, "left": 32 },
+                  "cornerRadius": 8,
+                  "strokes": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.6, "b": 0.2 } }],
+                  "strokeWeight": 1,
+                  "children": [
+                    { "type": "TEXT", "characters": "View Case Studies", "fontSize": 16, "fontName": { "family": "Inter", "style": "Medium" }, "fills": [{ "type": "SOLID", "color": { "r": 0.2, "g": 0.6, "b": 0.2 } }] }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "RECTANGLE",
+          "name": "Hero Image Placeholder",
+          "layoutGrow": 1,
+          "height": 500,
+          "cornerRadius": 16,
+          "fills": [{ "type": "SOLID", "color": { "r": 0.9, "g": 0.95, "b": 0.9 } }]
+        }
+      ]
+    }
+  ]
+}

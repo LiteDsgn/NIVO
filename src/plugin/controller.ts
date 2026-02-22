@@ -1,5 +1,27 @@
 figma.showUI(__html__, { width: 360, height: 600, themeColors: true });
 
+/**
+ * Scan all top-level nodes on the current page and find a position
+ * to the right of the rightmost node (with a 100px gap).
+ */
+function findOpenCanvasPosition(): { x: number; y: number } {
+  const nodes = figma.currentPage.children;
+  if (nodes.length === 0) return { x: 0, y: 0 };
+
+  let maxRight = -Infinity;
+  let topAtMaxRight = 0;
+
+  for (const node of nodes) {
+    const right = node.x + node.width;
+    if (right > maxRight) {
+      maxRight = right;
+      topAtMaxRight = node.y;
+    }
+  }
+
+  return { x: Math.round(maxRight + 100), y: Math.round(topAtMaxRight) };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
   let node: SceneNode;
@@ -8,7 +30,7 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     const frame = figma.createFrame();
     node = frame;
     frame.name = nodeData.name || "Frame";
-    if (nodeData.width) frame.resize(nodeData.width, nodeData.height);
+    if (nodeData.width && nodeData.height) frame.resize(nodeData.width, nodeData.height);
     if (nodeData.layoutMode) frame.layoutMode = nodeData.layoutMode;
     if (nodeData.itemSpacing) frame.itemSpacing = nodeData.itemSpacing;
     if (nodeData.padding) {
@@ -44,6 +66,15 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
       }
     }
     parent.appendChild(frame);
+
+    // Support FILL / HUG sizing — must be set AFTER appending to an auto-layout parent
+    try {
+      if (nodeData.layoutSizingHorizontal) frame.layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
+      if (nodeData.layoutSizingVertical) frame.layoutSizingVertical = nodeData.layoutSizingVertical;
+    } catch (e) {
+      // FILL is only valid inside auto-layout parents; silently ignore if not applicable
+      console.log("layoutSizing skipped for", frame.name, e);
+    }
 
   } else if (nodeData.type === 'INSTANCE') {
     // INSTANCE CREATION
@@ -134,7 +165,7 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
     node = shape;
     shape.name = nodeData.name || (nodeData.type === 'ELLIPSE' ? "Ellipse" : "Rectangle");
-    if (nodeData.width) shape.resize(nodeData.width, nodeData.height);
+    if (nodeData.width && nodeData.height) shape.resize(nodeData.width, nodeData.height);
 
     // Handle Image Placeholder
     if (nodeData.image) {
@@ -320,17 +351,27 @@ figma.ui.onmessage = async (msg) => {
     // Let's assume the root is a Frame as per our prompt instructions.
 
     try {
+      const pos = findOpenCanvasPosition();
       const nodes: SceneNode[] = [];
       if (Array.isArray(structure)) {
         // If it returns a list of nodes
         for (const nodeData of structure) {
           const node = await createNode(nodeData, figma.currentPage);
-          if (node) nodes.push(node);
+          if (node) {
+            node.x = pos.x;
+            node.y = pos.y;
+            pos.y += node.height + 40; // stack multiple roots vertically
+            nodes.push(node);
+          }
         }
       } else {
         // Single root node
         const node = await createNode(structure, figma.currentPage);
-        if (node) nodes.push(node);
+        if (node) {
+          node.x = pos.x;
+          node.y = pos.y;
+          nodes.push(node);
+        }
       }
 
       // Mark all as draft
