@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "nivo-figma": {
+            "command": "npx",
+            "args": [
+                "--yes",
+                "tsx",
+                "c:\\Users\\adeba\\OneDrive\\Documents\\Plugin\\Nivo\\mcp-server\\server.ts"
+            ]
+        }
+    }
+}

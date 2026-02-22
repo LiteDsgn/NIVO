@@ -54,10 +54,10 @@ export default function Settings() {
           <h2 className="text-[10px] font-semibold text-figma-text-secondary uppercase tracking-wider px-0.5 mb-2">MCP Bridge</h2>
           <SettingRow
             icon={<Unplug size={13} />}
-            label="Antigravity Bridge"
+            label="External AI Bridge"
             description={
               !enabled
-                ? 'Disabled — external AI tools cannot connect'
+                ? 'Disabled — AI coding tools cannot connect'
                 : connected
                   ? 'Connected — receiving commands'
                   : 'Waiting for connection…'
@@ -67,8 +67,8 @@ export default function Settings() {
               {enabled && (
                 <span
                   className={`w-[7px] h-[7px] rounded-full shrink-0 ${connected
-                      ? 'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]'
-                      : 'bg-amber-500 animate-pulse'
+                    ? 'bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]'
+                    : 'bg-amber-500 animate-pulse'
                     }`}
                 />
               )}
