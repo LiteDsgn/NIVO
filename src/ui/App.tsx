@@ -59,7 +59,7 @@ export default function App() {
             }
           >
             <Palette className="h-3.5 w-3.5" />
-            <span>Design System</span>
+            <span>DS</span>
           </NavLink>
           <NavLink
             to="/settings"
