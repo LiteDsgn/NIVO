@@ -126,28 +126,33 @@ export default function Home() {
         return; // Don't trigger the canvas update if it's just planning text
       }
 
-      // If we got here, we have a UI structure
-      const naturalResponses = [
-        "Done! Check the canvas for your new design.",
-        "Here you go, I've laid it out on the canvas.",
-        "All set! Let me know if you want to tweak anything.",
-        "Design generated successfully."
-      ];
+      // If we got here, we have a UI structure. We might also have conversational text.
+      let messageContent = result.text;
 
-      const naturalModResponses = [
-        "I've applied those changes to the design.",
-        "Updated successfully based on your request.",
-        "The design has been modified. How does it look?",
-        "Changes applied to the canvas!"
-      ];
+      if (!messageContent) {
+        // Fallback generic messages if the model only gave raw `<UI_JSON>` without text
+        const naturalResponses = [
+          "Done! Check the canvas for your new design.",
+          "Here you go, I've laid it out on the canvas.",
+          "All set! Let me know if you want to tweak anything.",
+          "Design generated successfully."
+        ];
 
-      const responsePool = context ? naturalModResponses : naturalResponses;
-      const randomContent = responsePool[Math.floor(Math.random() * responsePool.length)];
+        const naturalModResponses = [
+          "I've applied those changes to the design.",
+          "Updated successfully based on your request.",
+          "The design has been modified. How does it look?",
+          "Changes applied to the canvas!"
+        ];
+
+        const responsePool = context ? naturalModResponses : naturalResponses;
+        messageContent = responsePool[Math.floor(Math.random() * responsePool.length)];
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: randomContent
+        content: messageContent
       };
       setMessages(prev => [...prev, assistantMessage]);
 

@@ -19,7 +19,7 @@ export async function generateUI(messages: { role: 'user' | 'assistant', content
     const isReasoning = settings?.reasoningMode === true;
     const model = getGenAI().getGenerativeModel({
       model: modelName,
-      ...(isReasoning ? {} : { generationConfig: { responseMimeType: "application/json" } })
+      // We removed responseMimeType: "application/json" so the model can always converse
     });
 
     let systemPrompt = `
@@ -120,18 +120,19 @@ export async function generateUI(messages: { role: 'user' | 'assistant', content
          Children: [Label(TEXT, 13px), Input Frame(HORIZONTAL, border-like fill, cornerRadius:8, padding 12)]
 
       ═══════════════════════════════════════════
-      SECTION 3: OUTPUT FORMAT
+      SECTION 3: CONVERSATIONAL WORKFLOW & OUTPUT FORMAT
       ═══════════════════════════════════════════
-      ${isReasoning ? `
-      You are in REASONING & PLANNING MODE. You can choose to either:
-      1. ASK CLARIFYING QUESTIONS / PRESENT A PLAN: If the user's request is vague or lacks necessary details (e.g., they ask for "a screen" without specifying the type or purpose, or you need to confirm layout choices), return PLAIN TEXT explaining your plan or asking concise questions. Do NOT return JSON in this case. Only ask questions if context is truly missing (do not ask annoying or easily-assumable questions).
-      2. GENERATE DESIGN: If you have enough context to generate the design, you MUST wrap your JSON output in <UI_JSON> tags like this:
-         <UI_JSON>
-         { ... json ... }
-         </UI_JSON>
-      ` : `
-      Generate a JSON object (single root node) or array of nodes.
-      `}
+      You are a consultative UI designer.
+
+      STEP 1 (CLARIFY): If the user's request is vague (e.g. "a fitness app", "a landing page") OR lacks necessary details, DO NOT generate a design immediately. Reply with a short, conversational plain-text message asking 2-3 specific questions about:
+      - Target audience / Vibe (e.g. premium dark mode vs bright/playful)
+      - Key data or features to emphasize
+      Do not ask annoying or obvious questions. Do not return JSON if you are asking questions.
+
+      STEP 2 (DESIGN): Once you have enough context (or if the user provided a detailed prompt initially), you MUST generate the design. When you generate a design, you MUST wrap your JSON output EXACTLY in <UI_JSON> tags like this:
+      <UI_JSON>
+      { ... json ... }
+      </UI_JSON>
 
       NODE SCHEMA:
       {
@@ -144,6 +145,8 @@ export async function generateUI(messages: { role: 'user' | 'assistant', content
         "layoutMode": "VERTICAL" | "HORIZONTAL" | "NONE",
         "primaryAxisSizingMode": "FIXED" | "AUTO" (optional, default AUTO. Make FIXED for root frames!),
         "counterAxisSizingMode": "FIXED" | "AUTO" (optional, default AUTO. Make FIXED for root frames!),
+        "layoutSizingHorizontal": "FIXED" | "HUG" | "FILL" (optional, for children inside Auto Layout parents),
+        "layoutSizingVertical": "FIXED" | "HUG" | "FILL" (optional, for children inside Auto Layout parents),
         "itemSpacing": number,
         "padding": { "top": n, "right": n, "bottom": n, "left": n },
         "characters": "string (TEXT nodes only)",
@@ -171,113 +174,7 @@ export async function generateUI(messages: { role: 'user' | 'assistant', content
       ✓ Visual interest through layering, color blocks, badges, icons-as-shapes, and accent elements
       ✓ Text content is realistic and contextual — no "Lorem ipsum". Write real copy.
 
-      EXAMPLE — Professional Pricing Card:
-      {
-        "type": "FRAME",
-        "name": "Pricing Card — Pro",
-        "width": 340,
-        "height": 520,
-        "layoutMode": "VERTICAL",
-        "itemSpacing": 0,
-        "padding": {"top": 0, "right": 0, "bottom": 0, "left": 0},
-        "cornerRadius": 16,
-        "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1}}],
-        "children": [
-          {
-            "type": "FRAME",
-            "name": "Card Header",
-            "width": 340,
-            "height": 160,
-            "layoutMode": "VERTICAL",
-            "itemSpacing": 8,
-            "padding": {"top": 32, "right": 32, "bottom": 24, "left": 32},
-            "fills": [{"type": "SOLID", "color": {"r": 0.15, "g": 0.10, "b": 0.35}}],
-            "children": [
-              {
-                "type": "FRAME",
-                "name": "Badge",
-                "width": 80,
-                "height": 24,
-                "layoutMode": "HORIZONTAL",
-                "padding": {"top": 4, "right": 12, "bottom": 4, "left": 12},
-                "itemSpacing": 0,
-                "cornerRadius": 999,
-                "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1}}],
-                "children": [
-                  {"type": "TEXT", "name": "Badge Label", "characters": "Popular", "fontSize": 11, "fontWeight": "Bold", "fills": [{"type": "SOLID", "color": {"r": 0.15, "g": 0.10, "b": 0.35}}]}
-                ]
-              },
-              {"type": "TEXT", "name": "Plan Name", "characters": "Professional", "fontSize": 24, "fontWeight": "Bold", "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1}}]},
-              {
-                "type": "FRAME",
-                "name": "Price Row",
-                "layoutMode": "HORIZONTAL",
-                "itemSpacing": 4,
-                "padding": {"top": 0, "right": 0, "bottom": 0, "left": 0},
-                "children": [
-                  {"type": "TEXT", "name": "Price", "characters": "$49", "fontSize": 36, "fontWeight": "Bold", "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1}}]},
-                  {"type": "TEXT", "name": "Period", "characters": "/month", "fontSize": 14, "fontWeight": "Regular", "fills": [{"type": "SOLID", "color": {"r": 0.80, "g": 0.75, "b": 0.90}}]}
-                ]
-              }
-            ]
-          },
-          {
-            "type": "FRAME",
-            "name": "Features List",
-            "layoutMode": "VERTICAL",
-            "itemSpacing": 14,
-            "padding": {"top": 28, "right": 32, "bottom": 28, "left": 32},
-            "children": [
-              {
-                "type": "FRAME", "name": "Feature Item", "layoutMode": "HORIZONTAL", "itemSpacing": 10, "padding": {"top": 0, "right": 0, "bottom": 0, "left": 0},
-                "children": [
-                  {"type": "ELLIPSE", "name": "Check Dot", "width": 8, "height": 8, "fills": [{"type": "SOLID", "color": {"r": 0.30, "g": 0.80, "b": 0.55}}]},
-                  {"type": "TEXT", "name": "Feature Text", "characters": "Unlimited projects", "fontSize": 14, "fontWeight": "Regular", "fills": [{"type": "SOLID", "color": {"r": 0.30, "g": 0.30, "b": 0.35}}]}
-                ]
-              },
-              {
-                "type": "FRAME", "name": "Feature Item", "layoutMode": "HORIZONTAL", "itemSpacing": 10, "padding": {"top": 0, "right": 0, "bottom": 0, "left": 0},
-                "children": [
-                  {"type": "ELLIPSE", "name": "Check Dot", "width": 8, "height": 8, "fills": [{"type": "SOLID", "color": {"r": 0.30, "g": 0.80, "b": 0.55}}]},
-                  {"type": "TEXT", "name": "Feature Text", "characters": "Priority support", "fontSize": 14, "fontWeight": "Regular", "fills": [{"type": "SOLID", "color": {"r": 0.30, "g": 0.30, "b": 0.35}}]}
-                ]
-              },
-              {
-                "type": "FRAME", "name": "Feature Item", "layoutMode": "HORIZONTAL", "itemSpacing": 10, "padding": {"top": 0, "right": 0, "bottom": 0, "left": 0},
-                "children": [
-                  {"type": "ELLIPSE", "name": "Check Dot", "width": 8, "height": 8, "fills": [{"type": "SOLID", "color": {"r": 0.30, "g": 0.80, "b": 0.55}}]},
-                  {"type": "TEXT", "name": "Feature Text", "characters": "Advanced analytics", "fontSize": 14, "fontWeight": "Regular", "fills": [{"type": "SOLID", "color": {"r": 0.30, "g": 0.30, "b": 0.35}}]}
-                ]
-              }
-            ]
-          },
-          {
-            "type": "FRAME",
-            "name": "CTA Container",
-            "layoutMode": "VERTICAL",
-            "itemSpacing": 0,
-            "padding": {"top": 8, "right": 32, "bottom": 32, "left": 32},
-            "children": [
-              {
-                "type": "FRAME",
-                "name": "CTA Button",
-                "width": 276,
-                "height": 48,
-                "layoutMode": "HORIZONTAL",
-                "padding": {"top": 14, "right": 24, "bottom": 14, "left": 24},
-                "itemSpacing": 0,
-                "cornerRadius": 10,
-                "fills": [{"type": "SOLID", "color": {"r": 0.15, "g": 0.10, "b": 0.35}}],
-                "children": [
-                  {"type": "TEXT", "name": "Button Label", "characters": "Get Started", "fontSize": 15, "fontWeight": "SemiBold", "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1}}]}
-                ]
-              }
-            ]
-          }
-        ]
-      }
-
-      ${isReasoning ? `If generating JSON, it MUST be valid JSON wrapped in <UI_JSON> tags.` : `Return ONLY valid JSON. No markdown. No comments. No explanation.`}
+      If generating JSON, it MUST be valid JSON wrapped in <UI_JSON> tags.
     `;
 
     if (designSystem) {
@@ -386,18 +283,23 @@ export async function generateUI(messages: { role: 'user' | 'assistant', content
     const response = await result.response;
     const text = response.text();
 
-    // Clean up potential markdown code blocks
-    const jsonString = text.replace(/```json\n?|\n?```/g, "").trim();
+    // Look for <UI_JSON> tags. If present, we have a design.
+    // Also extract any text that appears before/after the tags to return to the user.
+    const match = text.match(/<UI_JSON>([\s\S]*?)<\/UI_JSON>/);
+    if (match && match[1]) {
+      const jsonText = match[1].trim();
+      const conversationalText = text.replace(match[0], '').trim();
 
-    if (isReasoning) {
-      const match = text.match(/<UI_JSON>([\s\S]*?)<\/UI_JSON>/);
-      if (match && match[1]) {
-        return { type: 'ui', structure: JSON.parse(match[1].trim()) };
-      }
-      return { type: 'text', text: text.trim() };
+      const parsedStruct = JSON.parse(jsonText);
+      return {
+        type: 'ui',
+        structure: parsedStruct,
+        text: conversationalText // Return the conversational part alongside the UI so chat can display it
+      };
     }
 
-    return { type: 'ui', structure: JSON.parse(jsonString) };
+    // No UI tags found, assume it is purely conversational text
+    return { type: 'text', text: text.trim() };
   } catch (error) {
     console.error("Error generating UI:", error);
     throw error;
