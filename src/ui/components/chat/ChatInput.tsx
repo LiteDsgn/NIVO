@@ -110,9 +110,6 @@ export function ChatInput({ onSend, isLoading, selection = [] }: ChatInputProps)
           )}
         </button>
       </div>
-      <div className="mt-1 text-[10px] text-figma-text-tertiary text-center">
-        Press Enter to generate
-      </div>
     </div>
   );
 }
