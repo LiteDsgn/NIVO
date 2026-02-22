@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ChatInput, ModelType } from '@/components/chat/ChatInput';
+import { DraftControls } from '@/components/chat/DraftControls';
 import { generateUI } from '@/lib/services/gemini';
+import { useSettingsStore } from '@/lib/stores/settingsStore';
 
 interface Message {
   id: string;
@@ -19,7 +21,9 @@ export default function Home() {
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [draftMode, setDraftMode] = useState(false);
   const [selection, setSelection] = useState<{ id: string; name: string; type: string }[]>([]);
+  const { brandContext, enforceWCAG } = useSettingsStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -32,15 +36,30 @@ export default function Home() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const { type, selection: newSelection } = event.data.pluginMessage || {};
+      const { type, selection: newSelection, status } = event.data.pluginMessage || {};
+
       if (type === 'selection-changed') {
         setSelection(newSelection);
+      } else if (type === 'generation-complete') {
+        if (status === 'success') {
+          setDraftMode(true);
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  const handleDraftAccept = () => {
+    parent.postMessage({ pluginMessage: { type: 'accept-draft' } }, '*');
+    setDraftMode(false);
+  };
+
+  const handleDraftDiscard = () => {
+    parent.postMessage({ pluginMessage: { type: 'discard-draft' } }, '*');
+    setDraftMode(false);
+  };
 
   const getSelectionContext = (): Promise<{ context: { id: string } | null; designSystem: { paintStyles: unknown; textStyles: unknown; } | null }> => {
     return new Promise((resolve) => {
@@ -82,7 +101,10 @@ export default function Home() {
       const { context, designSystem } = await getSelectionContext();
 
       // Call Gemini API
-      const uiStructure = await generateUI(content, model, context, designSystem);
+      const uiStructure = await generateUI(content, model, context, designSystem, {
+        brandContext,
+        enforceWCAG,
+      });
 
       // Add assistant message
       const assistantMessage: Message = {
@@ -150,7 +172,13 @@ export default function Home() {
       </div>
 
       {/* Input Area */}
-      <ChatInput onSend={handleSendMessage} isLoading={isLoading} selection={selection} />
+      <div className={`transition-all duration-200 ${draftMode ? 'pointer-events-none opacity-40' : ''}`}>
+        <ChatInput onSend={handleSendMessage} isLoading={isLoading} selection={selection} />
+      </div>
+
+      {draftMode && (
+        <DraftControls onAccept={handleDraftAccept} onDiscard={handleDraftDiscard} />
+      )}
     </div>
   );
 }

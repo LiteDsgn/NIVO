@@ -41,18 +41,54 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
     parent.appendChild(frame);
 
+  } else if (nodeData.type === 'INSTANCE') {
+    // INSTANCE CREATION
+    if (nodeData.componentKey) {
+      try {
+        const component = await figma.importComponentByKeyAsync(nodeData.componentKey);
+        const instance = component.createInstance();
+        node = instance;
+        instance.name = nodeData.name || instance.name;
+
+        if (nodeData.width && nodeData.height) instance.resize(nodeData.width, nodeData.height);
+
+        // Apply overrides if any (basic ones)
+        if (nodeData.layoutMode) instance.layoutMode = nodeData.layoutMode;
+        if (nodeData.itemSpacing) instance.itemSpacing = nodeData.itemSpacing;
+        if (nodeData.padding) {
+          instance.paddingTop = nodeData.padding.top;
+          instance.paddingRight = nodeData.padding.right;
+          instance.paddingBottom = nodeData.padding.bottom;
+          instance.paddingLeft = nodeData.padding.left;
+        }
+
+        parent.appendChild(instance);
+      } catch (e) {
+        console.log("Failed to create instance", e);
+        // Fallback to frame
+        const frame = figma.createFrame();
+        node = frame;
+        frame.name = "Missing Component";
+        frame.resize(nodeData.width || 100, nodeData.height || 100);
+        frame.fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }]; // Red error box
+        parent.appendChild(frame);
+      }
+    }
+
   } else if (nodeData.type === 'TEXT') {
     const fontStyle = nodeData.fontWeight || "Regular";
+    let loadedStyle = fontStyle;
     try {
       await figma.loadFontAsync({ family: "Inter", style: fontStyle });
     } catch {
       // Fallback to Regular if the requested style isn't available
+      loadedStyle = "Regular";
       await figma.loadFontAsync({ family: "Inter", style: "Regular" });
     }
     const text = figma.createText();
     node = text;
     text.name = nodeData.name || "Text";
-    text.fontName = { family: "Inter", style: fontStyle };
+    text.fontName = { family: "Inter", style: loadedStyle };
     text.characters = nodeData.characters || "Text";
     if (nodeData.fontSize) text.fontSize = nodeData.fontSize;
     if (nodeData.fills) text.fills = nodeData.fills;
@@ -70,20 +106,40 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
     parent.appendChild(text);
 
-  } else if (nodeData.type === 'RECTANGLE') {
-    const rect = figma.createRectangle();
-    node = rect;
-    rect.name = nodeData.name || "Rectangle";
-    if (nodeData.width) rect.resize(nodeData.width, nodeData.height);
-    if (nodeData.fills) rect.fills = nodeData.fills;
+  } else if (nodeData.type === 'RECTANGLE' || nodeData.type === 'ELLIPSE') {
+    let shape;
+    if (nodeData.type === 'ELLIPSE') {
+      shape = figma.createEllipse();
+    } else {
+      shape = figma.createRectangle();
+    }
+    node = shape;
+    shape.name = nodeData.name || (nodeData.type === 'ELLIPSE' ? "Ellipse" : "Rectangle");
+    if (nodeData.width) shape.resize(nodeData.width, nodeData.height);
+
+    // Handle Image Placeholder
+    if (nodeData.image) {
+      // Create a solid fill with a slightly different color to indicate placeholder
+      // In a real production app, we would fetch a real image bytes here.
+      // For now, let's make it a nice placeholder gray with text if possible? 
+      // Actually, we can't easily add text inside a rectangle in Figma without a Frame.
+      // So we'll just apply a placeholder color.
+      shape.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
+
+      // Add a tag to name to indicate it's an image
+      shape.name = `[Img] ${nodeData.image}`;
+    } else if (nodeData.fills) {
+      shape.fills = nodeData.fills;
+    }
+
     if (nodeData.fillStyleId) {
       try {
         await figma.importStyleByKeyAsync(nodeData.fillStyleId).catch(() => { });
-        rect.fillStyleId = nodeData.fillStyleId;
-      } catch (e) { console.log("Could not apply rect fillStyleId", e); }
+        shape.fillStyleId = nodeData.fillStyleId;
+      } catch (e) { console.log("Could not apply shape fillStyleId", e); }
     }
-    if (nodeData.cornerRadius) rect.cornerRadius = nodeData.cornerRadius;
-    parent.appendChild(rect);
+    if (nodeData.cornerRadius && nodeData.type === 'RECTANGLE') shape.cornerRadius = nodeData.cornerRadius;
+    parent.appendChild(shape);
   } else {
     // Fallback for unknown types (or just skip)
     return;
@@ -160,15 +216,27 @@ async function getDesignSystem() {
     fontSize: style.fontSize
   }));
 
-  // Variables are a bit more complex, let's start with Styles first as they are easier to map
-  // for basic generation.
+  // Scan local components
+  // We'll limit to first 50 to avoid hitting limits or slowing down too much
+  const localComponents = figma.currentPage.findAll(node => node.type === "COMPONENT").slice(0, 50).map((node: ComponentNode) => ({
+    id: node.key, // Use key for persistent reference
+    name: node.name,
+    description: node.description || "",
+    width: node.width,
+    height: node.height
+  }));
 
-  return { paintStyles, textStyles };
+  return { paintStyles, textStyles, components: localComponents };
 }
+
+let currentDraftNodeIds: string[] = [];
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === 'generate-ui-from-json') {
     const structure = msg.structure;
+
+    // Clear any previous draft if it wasn't accepted/discarded explicitly (edge case)
+    currentDraftNodeIds = [];
 
     // If we have an existing selection ID to update/replace
     if (msg.replaceNodeId) {
@@ -188,13 +256,37 @@ figma.ui.onmessage = async (msg) => {
           }
 
           if (newNode) {
+            // Cast nodeToReplace to SceneNode since it has a parent and x/y properties we're accessing
+            const sceneNodeToReplace = nodeToReplace as SceneNode;
+
             // Position it where the old one was
-            if ('x' in nodeToReplace && 'x' in newNode) {
-              newNode.x = nodeToReplace.x;
-              newNode.y = nodeToReplace.y;
+            if ('x' in sceneNodeToReplace && 'x' in newNode) {
+              newNode.x = sceneNodeToReplace.x;
+              newNode.y = sceneNodeToReplace.y;
             }
-            // Remove old node
-            nodeToReplace.remove();
+
+            // Maintain layer order (important for Auto Layout)
+            const index = parent.children.indexOf(sceneNodeToReplace);
+            if (index !== -1) {
+              parent.insertChild(index, newNode);
+            }
+
+            // Mark as draft
+            currentDraftNodeIds.push(newNode.id);
+            newNode.setPluginData('isDraft', 'true');
+            newNode.name = `[Draft] ${newNode.name}`;
+
+            // Remove old node? 
+            // WAIT! If it's a draft, we shouldn't remove the old node yet!
+            // We should hide it or just place the new one on top?
+            // "In-place edit" implies replacement.
+            // If we discard, we want the old one back.
+            // So: Hide old node, show new node.
+            sceneNodeToReplace.visible = false;
+            sceneNodeToReplace.setPluginData('replacedByDraft', newNode.id);
+
+            // We need to track that this draft replaced a specific node
+            newNode.setPluginData('draftReplaces', sceneNodeToReplace.id);
 
             figma.currentPage.selection = [newNode];
           }
@@ -209,29 +301,73 @@ figma.ui.onmessage = async (msg) => {
     // Let's assume the root is a Frame as per our prompt instructions.
 
     try {
+      const nodes: SceneNode[] = [];
       if (Array.isArray(structure)) {
         // If it returns a list of nodes
-        const nodes: SceneNode[] = [];
         for (const nodeData of structure) {
           const node = await createNode(nodeData, figma.currentPage);
           if (node) nodes.push(node);
         }
-        figma.currentPage.selection = nodes;
-        figma.viewport.scrollAndZoomIntoView(nodes);
       } else {
         // Single root node
         const node = await createNode(structure, figma.currentPage);
-        if (node) {
-          figma.currentPage.selection = [node];
-          figma.viewport.scrollAndZoomIntoView([node]);
-        }
+        if (node) nodes.push(node);
       }
+
+      // Mark all as draft
+      for (const node of nodes) {
+        currentDraftNodeIds.push(node.id);
+        node.setPluginData('isDraft', 'true');
+        node.name = `[Draft] ${node.name}`;
+      }
+
+      figma.currentPage.selection = nodes;
+      figma.viewport.scrollAndZoomIntoView(nodes);
 
       figma.ui.postMessage({ type: 'generation-complete', status: 'success' });
     } catch (err) {
       console.error("Error creating nodes:", err);
       figma.ui.postMessage({ type: 'generation-error', message: String(err) });
     }
+
+  } else if (msg.type === 'accept-draft') {
+    for (const id of currentDraftNodeIds) {
+      const node = figma.getNodeById(id);
+      if (node) {
+        node.setPluginData('isDraft', ''); // Clear draft flag
+        node.name = node.name.replace('[Draft] ', ''); // Remove prefix
+
+        // If this replaced a node, remove the original
+        const replacedId = node.getPluginData('draftReplaces');
+        if (replacedId) {
+          const replacedNode = figma.getNodeById(replacedId);
+          if (replacedNode) {
+            replacedNode.remove();
+          }
+        }
+      }
+    }
+    currentDraftNodeIds = [];
+    figma.notify("Draft accepted");
+
+  } else if (msg.type === 'discard-draft') {
+    for (const id of currentDraftNodeIds) {
+      const node = figma.getNodeById(id);
+      if (node) {
+        // If this replaced a node, restore the original
+        const replacedId = node.getPluginData('draftReplaces');
+        if (replacedId) {
+          const replacedNode = figma.getNodeById(replacedId);
+          if (replacedNode && 'visible' in replacedNode) {
+            (replacedNode as SceneNode).visible = true;
+            replacedNode.setPluginData('replacedByDraft', '');
+          }
+        }
+        node.remove();
+      }
+    }
+    currentDraftNodeIds = [];
+    figma.notify("Draft discarded");
 
   } else if (msg.type === 'get-selection-context') {
     const selection = figma.currentPage.selection;
