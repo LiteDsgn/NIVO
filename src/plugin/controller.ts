@@ -266,6 +266,35 @@ async function getDesignSystem() {
     fontSize: style.fontSize
   }));
 
+  const effectStyles = figma.getLocalEffectStyles().map(style => ({
+    id: style.key,
+    name: style.name,
+    type: 'EFFECT',
+    effects: style.effects
+  }));
+
+  const gridStyles = figma.getLocalGridStyles().map(style => ({
+    id: style.key,
+    name: style.name,
+    type: 'GRID',
+    layoutGrids: style.layoutGrids
+  }));
+
+  let localVariables: unknown[] = [];
+  if (figma.variables && figma.variables.getLocalVariablesAsync) {
+    try {
+      const allVars = await figma.variables.getLocalVariablesAsync();
+      localVariables = allVars.map(v => ({
+        id: v.key,
+        name: v.name,
+        resolvedType: v.resolvedType,
+        valuesByMode: v.valuesByMode
+      }));
+    } catch (e) {
+      console.warn("Could not fetch local variables", e);
+    }
+  }
+
   // Scan local components
   // We'll limit to first 50 to avoid hitting limits or slowing down too much
   const localComponents = figma.currentPage.findAll(node => node.type === "COMPONENT").slice(0, 50).map((node: ComponentNode) => ({
@@ -276,7 +305,7 @@ async function getDesignSystem() {
     height: node.height
   }));
 
-  return { paintStyles, textStyles, components: localComponents };
+  return { paintStyles, textStyles, effectStyles, gridStyles, variables: localVariables, components: localComponents };
 }
 
 let currentDraftNodeIds: string[] = [];
@@ -442,6 +471,13 @@ figma.ui.onmessage = async (msg) => {
     figma.ui.postMessage({
       type: 'selection-context-response',
       context: context,
+      designSystem: designSystem,
+      requestId: msg.requestId
+    });
+  } else if (msg.type === 'get-local-library') {
+    const designSystem = await getDesignSystem();
+    figma.ui.postMessage({
+      type: 'local-library-response',
       designSystem: designSystem,
       requestId: msg.requestId
     });
