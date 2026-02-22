@@ -8,7 +8,8 @@
     "build": "tsc && vite build --config vite.config.plugin.ts && vite build --config vite.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check": "tsc -b --noEmit"
+    "check": "tsc -b --noEmit",
+    "mcp": "cd mcp-server && npx tsx server.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

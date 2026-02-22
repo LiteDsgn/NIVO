@@ -7,6 +7,7 @@ import { WelcomeState } from '@/components/chat/WelcomeState';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { generateUI } from '@/lib/services/gemini';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useBridge } from '@/hooks/useBridge';
 
 interface Message {
   id: string;
@@ -16,6 +17,8 @@ interface Message {
 }
 
 export default function Home() {
+  // Connect to MCP WebSocket bridge (Antigravity ↔ Nivo)
+  useBridge();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [draftMode, setDraftMode] = useState(false);
