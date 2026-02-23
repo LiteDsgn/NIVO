@@ -50,14 +50,23 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
     if (nodeData.cornerRadius) frame.cornerRadius = nodeData.cornerRadius;
 
-    // Handle Sizing Modes (Hug vs Fixed)
-    if (nodeData.layoutMode && nodeData.layoutMode !== "NONE") {
+    // Handle Sizing Modes (Hug vs Fixed) and Auto Layout fallbacks
+    let appliedLayoutMode = nodeData.layoutMode;
+
+    // Robustness: If AI forgot layoutMode but provided children, default to VERTICAL to prevent overlapping.
+    if ((!appliedLayoutMode || appliedLayoutMode === "NONE") && nodeData.children && nodeData.children.length > 0) {
+      appliedLayoutMode = "VERTICAL";
+    }
+
+    if (appliedLayoutMode && appliedLayoutMode !== "NONE") {
+      frame.layoutMode = appliedLayoutMode;
+
       // Allow JSON to specify sizing modes, default to AUTO (Hug) for children,
       // but if it's the root node (parent is Page), default lateral to FIXED to keep device width.
       const isRoot = parent.type === 'PAGE' || parent.type === 'DOCUMENT';
 
-      frame.primaryAxisSizingMode = nodeData.primaryAxisSizingMode || (isRoot ? (nodeData.layoutMode === 'VERTICAL' ? 'AUTO' : 'FIXED') : 'AUTO');
-      frame.counterAxisSizingMode = nodeData.counterAxisSizingMode || (isRoot ? (nodeData.layoutMode === 'VERTICAL' ? 'FIXED' : 'AUTO') : 'AUTO');
+      frame.primaryAxisSizingMode = nodeData.primaryAxisSizingMode || (isRoot ? (appliedLayoutMode === 'VERTICAL' ? 'AUTO' : 'FIXED') : 'AUTO');
+      frame.counterAxisSizingMode = nodeData.counterAxisSizingMode || (isRoot ? (appliedLayoutMode === 'VERTICAL' ? 'FIXED' : 'AUTO') : 'AUTO');
     }
 
     if (nodeData.children) {
@@ -66,15 +75,6 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
       }
     }
     parent.appendChild(frame);
-
-    // Support FILL / HUG sizing — must be set AFTER appending to an auto-layout parent
-    try {
-      if (nodeData.layoutSizingHorizontal) frame.layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
-      if (nodeData.layoutSizingVertical) frame.layoutSizingVertical = nodeData.layoutSizingVertical;
-    } catch (e) {
-      // FILL is only valid inside auto-layout parents; silently ignore if not applicable
-      console.log("layoutSizing skipped for", frame.name, e);
-    }
 
   } else if (nodeData.type === 'INSTANCE') {
     // INSTANCE CREATION
@@ -169,14 +169,7 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
 
     // Handle Image Placeholder
     if (nodeData.image) {
-      // Create a solid fill with a slightly different color to indicate placeholder
-      // In a real production app, we would fetch a real image bytes here.
-      // For now, let's make it a nice placeholder gray with text if possible? 
-      // Actually, we can't easily add text inside a rectangle in Figma without a Frame.
-      // So we'll just apply a placeholder color.
       shape.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
-
-      // Add a tag to name to indicate it's an image
       shape.name = `[Img] ${nodeData.image}`;
     } else if (nodeData.fills) {
       shape.fills = nodeData.fills;
@@ -193,6 +186,26 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
   } else {
     // Fallback for unknown types (or just skip)
     return;
+  }
+
+  // Support FILL / HUG sizing for ALL nodes inside auto-layout parents
+  if (node && parent.type !== 'PAGE' && parent.type !== 'DOCUMENT') {
+    try {
+      // Special logic for TEXT nodes when set to FILL horizontally:
+      // They require textAutoResize to be 'HEIGHT' so they wrap text correctly.
+      if (node.type === 'TEXT' && nodeData.layoutSizingHorizontal === 'FILL') {
+        (node as TextNode).textAutoResize = 'HEIGHT';
+      }
+      if (nodeData.layoutSizingHorizontal && 'layoutSizingHorizontal' in node) {
+        (node as any).layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
+      }
+      if (nodeData.layoutSizingVertical && 'layoutSizingVertical' in node) {
+        (node as any).layoutSizingVertical = nodeData.layoutSizingVertical;
+      }
+    } catch (e) {
+      // FILL is only valid inside auto-layout parents; silently ignore if not applicable
+      console.log("layoutSizing skipped for", node.name, e);
+    }
   }
 
   return node;

@@ -287,7 +287,8 @@ export async function generateUI(messages: { role: 'user' | 'assistant', content
     // Also extract any text that appears before/after the tags to return to the user.
     const match = text.match(/<UI_JSON>([\s\S]*?)<\/UI_JSON>/);
     if (match && match[1]) {
-      const jsonText = match[1].trim();
+      // Clean up potential markdown formatting that the AI might sneak inside the tags
+      const jsonText = match[1].replace(/```json\n?|\n?```/g, '').trim();
       const conversationalText = text.replace(match[0], '').trim();
 
       const parsedStruct = JSON.parse(jsonText);
