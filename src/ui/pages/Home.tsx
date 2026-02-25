@@ -21,6 +21,8 @@ export default function Home() {
   useBridge();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [generationStage, setGenerationStage] = useState<'preparing' | 'thinking' | 'rendering'>('thinking');
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [draftMode, setDraftMode] = useState(false);
   const [selection, setSelection] = useState<{ id: string; name: string; type: string }[]>([]);
   const { brandContext, enforceWCAG } = useSettingsStore();
@@ -36,7 +38,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const { type, selection: newSelection, status } = event.data.pluginMessage || {};
+      const { type, selection: newSelection, status, message } = event.data.pluginMessage || {};
 
       if (type === 'selection-changed') {
         setSelection(newSelection);
@@ -44,6 +46,19 @@ export default function Home() {
         if (status === 'success') {
           setDraftMode(true);
         }
+        setIsLoading(false);
+        setElapsedMs(0);
+      } else if (type === 'generation-error') {
+        setIsLoading(false);
+        setElapsedMs(0);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `⚠️ ${message || 'Generation failed while rendering in Figma.'}`
+          }
+        ]);
       }
     };
 
@@ -100,11 +115,14 @@ export default function Home() {
     });
 
     setIsLoading(true);
+    setElapsedMs(0);
+    setGenerationStage('preparing');
 
     try {
       console.log(`Sending request to ${model} with prompt: ${content} (Reasoning: ${reasoningMode})`);
 
       const { context, designSystem } = await getSelectionContext();
+      setGenerationStage('thinking');
 
       const apiMessages = conversationHistory.map(m => ({ role: m.role, content: m.content }));
 
@@ -123,6 +141,7 @@ export default function Home() {
         };
         setMessages(prev => [...prev, assistantMessage]);
         setIsLoading(false);
+        setElapsedMs(0);
         return; // Don't trigger the canvas update if it's just planning text
       }
 
@@ -156,6 +175,7 @@ export default function Home() {
       };
       setMessages(prev => [...prev, assistantMessage]);
 
+      setGenerationStage('rendering');
       parent.postMessage({
         pluginMessage: {
           type: 'generate-ui-from-json',
@@ -186,10 +206,20 @@ export default function Home() {
         content: `⚠️ ${errorDetail}`
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
       setIsLoading(false);
+      setElapsedMs(0);
     }
   };
+
+  useEffect(() => {
+    if (!isLoading) return;
+    const start = Date.now();
+    setElapsedMs(0);
+    const interval = setInterval(() => {
+      setElapsedMs(Date.now() - start);
+    }, 250);
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   const hasMessages = messages.length > 0;
 
@@ -206,7 +236,7 @@ export default function Home() {
                 content={msg.content}
               />
             ))}
-            {isLoading && <TypingIndicator />}
+            {isLoading && <TypingIndicator stage={generationStage} elapsedMs={elapsedMs} />}
             <div ref={messagesEndRef} />
           </div>
         ) : (

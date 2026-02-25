@@ -15,7 +15,7 @@ try {
 
     const options = {
         hostname: 'localhost',
-        port: 9601,
+        port: 9600,
         path: '/generate',
         method: 'POST',
         headers: {

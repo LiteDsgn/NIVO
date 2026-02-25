@@ -13,7 +13,60 @@ import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import { z } from "zod";
 
-const WS_PORT = 9600;
+const PORT = 9600;
+
+// ─── Shared HTTP Server ──────────────────────────────────────────────────────
+
+const httpServer = http.createServer(async (req, res) => {
+    // Enable CORS
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    if (req.method === "GET" && req.url === "/selection") {
+        try {
+            console.error("[nivo-mcp] Received HTTP selection request");
+            const response = await sendToPlugin({ type: "get_selection" });
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(response));
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Unknown error";
+            console.error("[nivo-mcp] HTTP selection request failed:", err);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: message }));
+        }
+        return;
+    }
+
+    if (req.method === "POST" && req.url === "/generate") {
+        let body = "";
+        req.on("data", chunk => body += chunk);
+        req.on("end", async () => {
+            try {
+                const structure = JSON.parse(body);
+                console.error("[nivo-mcp] Received HTTP design request");
+                // Call sendToPlugin
+                await sendToPlugin({ type: "create", structure });
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ status: "success" }));
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : "Unknown error";
+                console.error("[nivo-mcp] HTTP request failed:", err);
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: message }));
+            }
+        });
+    } else {
+        res.writeHead(404);
+        res.end();
+    }
+});
 
 // ─── WebSocket Relay ──────────────────────────────────────────────────────────
 
@@ -23,15 +76,16 @@ const pendingRequests = new Map<
     { resolve: (value: unknown) => void; reject: (reason: Error) => void }
 >();
 
-const wss = new WebSocketServer({ port: WS_PORT });
+const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (ws) => {
     pluginSocket = ws;
-    console.error(`[nivo-mcp] Plugin connected via WebSocket on port ${WS_PORT}`);
+    console.error(`[nivo-mcp] Plugin connected via WebSocket on port ${PORT}`);
 
     ws.on("message", (data) => {
         try {
             const msg = JSON.parse(data.toString());
+            console.error(`[nivo-mcp] Received message from plugin: ${JSON.stringify(msg).slice(0, 100)}...`);
             // Messages from plugin are responses to our requests
             if (msg.requestId && pendingRequests.has(msg.requestId)) {
                 const pending = pendingRequests.get(msg.requestId)!;
@@ -54,7 +108,7 @@ wss.on("connection", (ws) => {
     });
 });
 
-console.error(`[nivo-mcp] WebSocket relay listening on ws://localhost:${WS_PORT}`);
+// ─── Helper Functions ────────────────────────────────────────────────────────
 
 /**
  * Send a command to the Nivo plugin and wait for a response.
@@ -246,49 +300,11 @@ server.registerTool(
     }
 );
 
-// ─── HTTP Command Server (for dev/testing) ────────────────────────────────────
-
-const HTTP_PORT = 9601;
-const httpServer = http.createServer((req, res) => {
-    // Enable CORS
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-    if (req.method === "OPTIONS") {
-        res.writeHead(204);
-        res.end();
-        return;
-    }
-
-    if (req.method === "POST" && req.url === "/generate") {
-        let body = "";
-        req.on("data", chunk => body += chunk);
-        req.on("end", async () => {
-            try {
-                const structure = JSON.parse(body);
-                console.error("[nivo-mcp] Received HTTP design request");
-                // Call sendToPlugin
-                await sendToPlugin({ type: "create", structure });
-                res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ status: "success" }));
-            } catch (err: any) {
-                console.error("[nivo-mcp] HTTP request failed:", err);
-                res.writeHead(500, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ error: err.message }));
-            }
-        });
-    } else {
-        res.writeHead(404);
-        res.end();
-    }
-});
-
-httpServer.listen(HTTP_PORT, () => {
-    console.error(`[nivo-mcp] HTTP command server listening on http://localhost:${HTTP_PORT}`);
-});
-
 // ─── Start ────────────────────────────────────────────────────────────────────
+
+httpServer.listen(PORT, () => {
+    console.error(`[nivo-mcp] Server listening on http://localhost:${PORT} (HTTP) and ws://localhost:${PORT} (WebSocket)`);
+});
 
 async function main() {
     const transport = new StdioServerTransport();
@@ -297,6 +313,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    console.error("[nivo-mcp] Fatal error:", err);
+    console.error("Fatal error in main:", err);
     process.exit(1);
 });

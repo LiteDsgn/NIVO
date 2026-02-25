@@ -1,10 +1,20 @@
 figma.showUI(__html__, { width: 360, height: 600, themeColors: true });
 
 /**
- * Scan all top-level nodes on the current page and find a position
- * to the right of the rightmost node (with a 100px gap).
+ * Find a canvas position for the new design.
+ * If a reference node is provided (e.g. the current selection), place
+ * the new design 60px to its right, aligned to its top.
+ * Otherwise, fall back to placing 100px right of the rightmost node.
  */
-function findOpenCanvasPosition(): { x: number; y: number } {
+function findOpenCanvasPosition(referenceNode?: SceneNode): { x: number; y: number } {
+  // If we have a reference node, place beside it
+  if (referenceNode) {
+    return {
+      x: Math.round(referenceNode.x + referenceNode.width + 60),
+      y: Math.round(referenceNode.y),
+    };
+  }
+
   const nodes = figma.currentPage.children;
   if (nodes.length === 0) return { x: 0, y: 0 };
 
@@ -22,17 +32,65 @@ function findOpenCanvasPosition(): { x: number; y: number } {
   return { x: Math.round(maxRight + 100), y: Math.round(topAtMaxRight) };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
+type AutoLayoutParent = FrameNode | ComponentNode | InstanceNode | ComponentSetNode;
+type LayoutSizingNode = SceneNode & {
+  layoutSizingHorizontal?: "FIXED" | "HUG" | "FILL";
+  layoutSizingVertical?: "FIXED" | "HUG" | "FILL";
+  layoutAlign?: "MIN" | "CENTER" | "MAX" | "STRETCH";
+  layoutGrow?: number;
+};
+
+function isAutoLayoutParent(node: BaseNode): node is AutoLayoutParent {
+  return 'layoutMode' in node;
+}
+
+function isAutoLayoutChild(node: SceneNode): node is LayoutSizingNode {
+  return 'layoutSizingHorizontal' in node && 'layoutSizingVertical' in node;
+}
+
+type NodeData = {
+  type: string;
+  name?: string;
+  width?: number;
+  height?: number;
+  layoutMode?: FrameNode["layoutMode"];
+  itemSpacing?: number;
+  padding?: { top: number; right: number; bottom: number; left: number };
+  fills?: readonly Paint[];
+  fillStyleId?: string;
+  cornerRadius?: number;
+  primaryAxisSizingMode?: FrameNode["primaryAxisSizingMode"];
+  counterAxisSizingMode?: FrameNode["counterAxisSizingMode"];
+  primaryAxisAlignItems?: FrameNode["primaryAxisAlignItems"];
+  counterAxisAlignItems?: FrameNode["counterAxisAlignItems"];
+  layoutSizingHorizontal?: "FIXED" | "HUG" | "FILL";
+  layoutSizingVertical?: "FIXED" | "HUG" | "FILL";
+  layoutAlign?: "MIN" | "CENTER" | "MAX" | "STRETCH";
+  layoutGrow?: number;
+  fontWeight?: string;
+  fontSize?: number;
+  characters?: string;
+  textStyleId?: string;
+  componentKey?: string;
+  image?: string;
+  children?: NodeData[];
+};
+
+async function createNode(nodeData: NodeData, parent: BaseNode & ChildrenMixin) {
   let node: SceneNode;
 
   if (nodeData.type === 'FRAME') {
     const frame = figma.createFrame();
     node = frame;
     frame.name = nodeData.name || "Frame";
-    if (nodeData.width && nodeData.height) frame.resize(nodeData.width, nodeData.height);
-    if (nodeData.layoutMode) frame.layoutMode = nodeData.layoutMode;
-    if (nodeData.itemSpacing) frame.itemSpacing = nodeData.itemSpacing;
+    if (nodeData.width !== undefined || nodeData.height !== undefined) {
+      frame.resize(
+        nodeData.width !== undefined ? nodeData.width : frame.width,
+        nodeData.height !== undefined ? nodeData.height : frame.height
+      );
+    }
+    if (nodeData.layoutMode !== undefined) frame.layoutMode = nodeData.layoutMode;
+    if (nodeData.itemSpacing !== undefined) frame.itemSpacing = nodeData.itemSpacing;
     if (nodeData.padding) {
       frame.paddingTop = nodeData.padding.top;
       frame.paddingRight = nodeData.padding.right;
@@ -48,7 +106,9 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
         console.log("Could not apply fillStyleId", e);
       }
     }
-    if (nodeData.cornerRadius) frame.cornerRadius = nodeData.cornerRadius;
+    if (nodeData.cornerRadius !== undefined) frame.cornerRadius = nodeData.cornerRadius;
+    if (nodeData.primaryAxisAlignItems !== undefined) frame.primaryAxisAlignItems = nodeData.primaryAxisAlignItems;
+    if (nodeData.counterAxisAlignItems !== undefined) frame.counterAxisAlignItems = nodeData.counterAxisAlignItems;
 
     // Handle Sizing Modes (Hug vs Fixed) and Auto Layout fallbacks
     let appliedLayoutMode = nodeData.layoutMode;
@@ -85,11 +145,16 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
         node = instance;
         instance.name = nodeData.name || instance.name;
 
-        if (nodeData.width && nodeData.height) instance.resize(nodeData.width, nodeData.height);
+        if (nodeData.width !== undefined || nodeData.height !== undefined) {
+          instance.resize(
+            nodeData.width !== undefined ? nodeData.width : instance.width,
+            nodeData.height !== undefined ? nodeData.height : instance.height
+          );
+        }
 
         // Apply overrides if any (basic ones)
-        if (nodeData.layoutMode) instance.layoutMode = nodeData.layoutMode;
-        if (nodeData.itemSpacing) instance.itemSpacing = nodeData.itemSpacing;
+        if (nodeData.layoutMode !== undefined) instance.layoutMode = nodeData.layoutMode;
+        if (nodeData.itemSpacing !== undefined) instance.itemSpacing = nodeData.itemSpacing;
         if (nodeData.padding) {
           instance.paddingTop = nodeData.padding.top;
           instance.paddingRight = nodeData.padding.right;
@@ -140,7 +205,7 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     text.name = nodeData.name || "Text";
     text.fontName = { family: "Inter", style: loadedStyle };
     text.characters = nodeData.characters || "Text";
-    if (nodeData.fontSize) text.fontSize = nodeData.fontSize;
+    if (nodeData.fontSize !== undefined) text.fontSize = nodeData.fontSize;
     if (nodeData.fills) text.fills = nodeData.fills;
     if (nodeData.fillStyleId) {
       try {
@@ -165,7 +230,12 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
     }
     node = shape;
     shape.name = nodeData.name || (nodeData.type === 'ELLIPSE' ? "Ellipse" : "Rectangle");
-    if (nodeData.width && nodeData.height) shape.resize(nodeData.width, nodeData.height);
+    if (nodeData.width !== undefined || nodeData.height !== undefined) {
+      shape.resize(
+        nodeData.width !== undefined ? nodeData.width : shape.width,
+        nodeData.height !== undefined ? nodeData.height : shape.height
+      );
+    }
 
     // Handle Image Placeholder
     if (nodeData.image) {
@@ -181,7 +251,7 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
         shape.fillStyleId = nodeData.fillStyleId;
       } catch (e) { console.log("Could not apply shape fillStyleId", e); }
     }
-    if (nodeData.cornerRadius && nodeData.type === 'RECTANGLE') shape.cornerRadius = nodeData.cornerRadius;
+    if (nodeData.cornerRadius !== undefined && nodeData.type === 'RECTANGLE') shape.cornerRadius = nodeData.cornerRadius;
     parent.appendChild(shape);
   } else {
     // Fallback for unknown types (or just skip)
@@ -191,16 +261,39 @@ async function createNode(nodeData: any, parent: BaseNode & ChildrenMixin) {
   // Support FILL / HUG sizing for ALL nodes inside auto-layout parents
   if (node && parent.type !== 'PAGE' && parent.type !== 'DOCUMENT') {
     try {
-      // Special logic for TEXT nodes when set to FILL horizontally:
-      // They require textAutoResize to be 'HEIGHT' so they wrap text correctly.
-      if (node.type === 'TEXT' && nodeData.layoutSizingHorizontal === 'FILL') {
+      const parentIsAutoLayout = isAutoLayoutParent(parent) && parent.layoutMode !== 'NONE';
+      const parentLayoutMode = parentIsAutoLayout ? parent.layoutMode : undefined;
+      let layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
+      let layoutSizingVertical = nodeData.layoutSizingVertical;
+
+      if (parentIsAutoLayout) {
+        if (layoutSizingHorizontal === undefined && nodeData.width === undefined) {
+          layoutSizingHorizontal = parentLayoutMode === 'VERTICAL' ? 'FILL' : 'HUG';
+        }
+        if (layoutSizingVertical === undefined && nodeData.height === undefined) {
+          layoutSizingVertical = parentLayoutMode === 'HORIZONTAL' ? 'FILL' : 'HUG';
+        }
+      }
+
+      if (node.type === 'TEXT' && layoutSizingHorizontal === 'FILL') {
         (node as TextNode).textAutoResize = 'HEIGHT';
       }
-      if (nodeData.layoutSizingHorizontal && 'layoutSizingHorizontal' in node) {
-        (node as any).layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
-      }
-      if (nodeData.layoutSizingVertical && 'layoutSizingVertical' in node) {
-        (node as any).layoutSizingVertical = nodeData.layoutSizingVertical;
+      if (isAutoLayoutChild(node)) {
+        if (layoutSizingHorizontal) node.layoutSizingHorizontal = layoutSizingHorizontal;
+        if (layoutSizingVertical) node.layoutSizingVertical = layoutSizingVertical;
+        if (nodeData.layoutAlign !== undefined) {
+          node.layoutAlign = nodeData.layoutAlign;
+        } else if (parentIsAutoLayout) {
+          if (parentLayoutMode === 'VERTICAL' && layoutSizingHorizontal === 'FILL') {
+            node.layoutAlign = 'STRETCH';
+          }
+          if (parentLayoutMode === 'HORIZONTAL' && layoutSizingVertical === 'FILL') {
+            node.layoutAlign = 'STRETCH';
+          }
+        }
+        if (nodeData.layoutGrow !== undefined) {
+          node.layoutGrow = nodeData.layoutGrow;
+        }
       }
     } catch (e) {
       // FILL is only valid inside auto-layout parents; silently ignore if not applicable
@@ -393,7 +486,10 @@ figma.ui.onmessage = async (msg) => {
     // Let's assume the root is a Frame as per our prompt instructions.
 
     try {
-      const pos = findOpenCanvasPosition();
+      // Use the current selection as the reference point for positioning
+      const selection = figma.currentPage.selection;
+      const referenceNode = selection.length > 0 ? selection[0] : undefined;
+      const pos = findOpenCanvasPosition(referenceNode);
       const nodes: SceneNode[] = [];
       if (Array.isArray(structure)) {
         // If it returns a list of nodes
@@ -473,7 +569,8 @@ figma.ui.onmessage = async (msg) => {
 
   } else if (msg.type === 'get-selection-context') {
     const selection = figma.currentPage.selection;
-    const designSystem = await getDesignSystem();
+    // const designSystem = await getDesignSystem();
+    const designSystem = null;
 
     let context = null;
     if (selection.length > 0) {

@@ -35,8 +35,11 @@ export function useBridge() {
      */
     const sendResponse = useCallback(
         (requestId: string, data: Record<string, unknown>) => {
+            console.log('[Bridge] Sending response:', requestId, data);
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify({ requestId, ...data }));
+            } else {
+                console.error('[Bridge] Cannot send response, WS not open', wsRef.current?.readyState);
             }
         },
         []
@@ -47,6 +50,7 @@ export function useBridge() {
      */
     const handleCommand = useCallback(
         (cmd: BridgeCommand) => {
+            console.log('[Bridge] Received command:', cmd);
             // Create a log entry for this command (with pending status)
             const logId = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -237,6 +241,7 @@ export function useBridge() {
                 }
 
                 case "get_selection": {
+                    console.log('[Bridge] Handling get_selection');
                     addLogEntry({
                         type: "command",
                         label: "Reading selection",
@@ -247,11 +252,13 @@ export function useBridge() {
 
                     const gsHandler = (event: MessageEvent) => {
                         const msg = event.data?.pluginMessage;
+                        console.log('[Bridge] Received message from plugin:', msg);
                         if (!msg) return;
                         if (
                             msg.type === "selection-context-response" &&
                             msg.requestId === gsRequestId
                         ) {
+                            console.log('[Bridge] Matched selection-context-response');
                             window.removeEventListener("message", gsHandler);
                             const entries = useBridgeStore.getState().activityLog;
                             const pe = entries.find(
@@ -285,6 +292,7 @@ export function useBridge() {
                     );
 
                     setTimeout(() => {
+                        console.log('[Bridge] Timeout for get_selection');
                         window.removeEventListener("message", gsHandler);
                         sendResponse(cmd.requestId, {
                             status: "success",
